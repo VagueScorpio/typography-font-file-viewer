@@ -22,10 +22,15 @@ packages/
 # ---- Debug symbols (symbols are embedded; a .pdb must never ship) ----
 *.pdb
 
-# ---- Test fonts (licensed material, downloaded locally; see docs blueprint 13.1) ----
+# ---- Test fonts (licensed material, built locally; see docs blueprint 13.1) ----
 tests/fonts/*
 !tests/fonts/.gitkeep
 !tests/fonts/README.md
+
+# ---- Python tooling for the test fonts (the scripts are committed, the venv is not) ----
+tools/.venv/
+tools/__pycache__/
+*.pyc
 
 # ---- Runtime files the app creates next to the exe (portable app) ----
 TypographyFontFileViewer.json

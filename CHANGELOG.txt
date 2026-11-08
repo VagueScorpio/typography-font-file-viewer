@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Test fonts: fonttools corpus builder
     - Phase 0: scaffold and de-risk
     - Naming: Typography Font File Viewer
     - Repository scaffold
@@ -11,6 +12,46 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Test fonts: fonttools corpus builder
+  WHAT: Added tools/ with requirements.txt (fonttools[woff] 4.68.0, pinned),
+        make-test-fonts.py and a README. The script builds the whole test-font
+        corpus into the git-ignored tests/fonts/ folder.
+  WHY:  Phase 2 checks the WOFF and WOFF 2.0 decoders by opening X.ttf, X.woff
+        and X.woff2 and demanding the same glyph count, family name and
+        outlines. Those triples have to be generated from one original, which
+        is exactly what fonttools is for. Standing the tooling up before
+        Phase 1 means the engine work can be tested against real fonts in every
+        supported format from its first commit, rather than against Arial alone.
+  HOW:  fonttools is installed into tools/.venv (git-ignored) so nothing touches
+        the system Python. The script fetches open-licensed sources, derives
+        wght 400/700 static instances from each variable font with
+        fontTools.varLib.instancer, packs two of them into a TestCollection.ttc,
+        then writes .woff and .woff2 beside every SFNT font by setting
+        TTFont.flavor. It re-runs idempotently (--force rebuilds, --no-fetch
+        works offline) and verifies every triple before reporting.
+
+  CORPUS BUILT (19.6 MB, 37 files, none committed):
+        9 .ttf   - Inter, Noto Sans, Noto Serif as variable fonts plus derived
+                   Regular/Bold statics
+        1 .otf   - Source Serif 4, CFF outlines rather than TrueType
+        1 .ttc   - two faces, built here
+        10 .woff + 10 .woff2 - one pair per SFNT font, all verified as matching
+                   triples
+        1 .pfa   - URW Nimbus Roman, PostScript Type 1
+        1 .bdf, 2 .pcf, 2 .fon - Spleen, the same bitmap font in all three
+                   containers
+
+  NOT COVERED: .dfont, which needs a macOS data-fork suitcase. There is no open
+        source to fetch and nothing on Windows produces one, so it is noted in
+        tests/fonts/README.md as a manual step. Windows system fonts
+        (cambria.ttc, msyh.ttc, seguiemj.ttf, the .fon files) are read in place
+        and deliberately never copied into the repository.
+
+  NOTE: The URW Type 1 font arrives as PFA (ASCII) rather than PFB (binary), so
+        the script sniffs the magic bytes and names the file accordingly instead
+        of trusting the source's .t1 extension — the same magic-bytes-first rule
+        the app itself uses.
 
 Phase 0: scaffold and de-risk
   WHAT: The solution now builds, tests and publishes. Added

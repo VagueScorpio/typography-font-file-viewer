@@ -1,0 +1,5 @@
+# Test-font tooling. Install into tools/.venv (see tools/README.md).
+#
+# fonttools[woff] pulls in brotli and zopfli, which are what WOFF 2.0 and WOFF 1.0
+# compression need. Without the extra, ttLib can read .woff2 but cannot write it.
+fonttools[woff]==4.68.0

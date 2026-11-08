@@ -121,6 +121,29 @@ dotnet test --solution TypographyFontFileViewer.slnx
 The tests run on Microsoft.Testing.Platform rather than VSTest, which the .NET 10 SDK
 requires a project to opt into; `global.json` does that for the whole repository.
 
+### Test fonts
+
+Tests that need real fonts read them from `tests/fonts/`, which is git-ignored and
+built on demand with [fonttools](https://github.com/fonttools/fonttools):
+
+```bat
+py -3 -m venv tools\.venv
+```
+
+```bat
+tools\.venv\Scripts\python.exe -m pip install -r tools\requirements.txt
+```
+
+```bat
+tools\.venv\Scripts\python.exe tools\make-test-fonts.py
+```
+
+That fetches open-licensed fonts, derives static instances and a `.ttc` from the
+variable ones, and converts every SFNT font into matching `.woff` and `.woff2` — the
+triples the WOFF decoders are checked against. Roughly 20 MB, covering every v1.0
+format except `.dfont`. Details in [tools/README.md](tools/README.md). Tests skip with
+a message when a font is missing, so the suite runs without this step.
+
 ## Architecture at a glance
 
 ```
@@ -179,6 +202,7 @@ docs/                             Blueprint and design documents
 publish.bat                       Single-file release build
 global.json                       Opts the repo into the Microsoft.Testing.Platform runner
 TypographyFontFileViewer.slnx     Solution (the .NET 10 SDK's XML solution format)
+tools/                            fonttools scripts that build the test-font corpus
 src/TypographyFontFileViewer/
   Core/                           Formats, sniffer, FaceKey, FontInfo, exceptions
   Engine/                         Engine thread, FaceCache, layout, rasterizer, metadata
