@@ -1,7 +1,7 @@
-# Simple Font Viewer — Architecture, Design & Build Blueprint (v1.0)
+# Typography Font File Viewer — Architecture, Design & Build Blueprint (v1.0)
 
 > **How to use this file:** Put it in an empty project folder, open Claude Code there, and say:
-> *"Read Simple-Font-Viewer-Blueprint-v1.0.md and build the app phase by phase. Stop after each phase, show me what works, and wait for my OK before starting the next."*
+> *"Read Typography-Font-File-Viewer-Blueprint-v1.0.md and build the app phase by phase. Stop after each phase, show me what works, and wait for my OK before starting the next."*
 
 ---
 
@@ -133,7 +133,7 @@ Detect formats by **magic bytes first, extension second**. A `.ttf` that is real
 
 ### 4.3 Data flow: "user double-clicks a font in Explorer"
 
-1. `SimpleFontViewer.exe "D:\Fonts\RobotoSlab-Bold.ttf"` starts.
+1. `TypographyFontFileViewer.exe "D:\Fonts\RobotoSlab-Bold.ttf"` starts.
 2. `FolderScanner` lists every supported file in `D:\Fonts\` (plus subfolders if that setting is on). The list appears immediately, showing file names.
 3. The opened file is selected, and `RenderService` renders its preview at high priority.
 4. In the background (low priority), the engine opens every other file to read family/style/face count. TTC files expand into one entry per face. List rows update as the metadata arrives.
@@ -238,7 +238,7 @@ Detect formats by **magic bytes first, extension second**. A `.ttf` that is real
 - Create the folder on the first favorite.
 
 ### 7.2 Source of truth
-The **files in the `Favorite Fonts` folder are the truth.** A small index in `SimpleFontViewer.json` speeds up lookups:
+The **files in the `Favorite Fonts` folder are the truth.** A small index in `TypographyFontFileViewer.json` speeds up lookups:
 
 ```json
 "favorites": [
@@ -373,15 +373,15 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 Everything lives next to the exe:
 
 ```
-SimpleFontViewer.exe
-SimpleFontViewer.json        ← settings + favorites index (created on first run)
+TypographyFontFileViewer.exe
+TypographyFontFileViewer.json        ← settings + favorites index (created on first run)
 Favorite Fonts\              ← created on first favorite
 ```
 
-`SimpleFontViewer.json` fields: window bounds/state, last folder, last selected file, recent folders, preview text, preview pt size, gallery pt size, glyph cell size, include subfolders, sort order, dark preview, selected tab, favorites index.
+`TypographyFontFileViewer.json` fields: window bounds/state, last folder, last selected file, recent folders, preview text, preview pt size, gallery pt size, glyph cell size, include subfolders, sort order, dark preview, selected tab, favorites index.
 
 - Write atomically (write `*.tmp`, then replace).
-- If the file is corrupt, rename it to `SimpleFontViewer.json.bad`, start with defaults, and say so in the status bar.
+- If the file is corrupt, rename it to `TypographyFontFileViewer.json.bad`, start with defaults, and say so in the status bar.
 
 ---
 
@@ -390,13 +390,13 @@ Favorite Fonts\              ← created on first favorite
 ### 11.1 Folder layout
 
 ```
-SimpleFontViewer/
-├─ SimpleFontViewer.sln
+TypographyFontFileViewer/
+├─ TypographyFontFileViewer.sln
 ├─ CHANGELOG.txt
 ├─ README.md
 ├─ publish.bat
-├─ src/SimpleFontViewer/
-│  ├─ SimpleFontViewer.csproj
+├─ src/TypographyFontFileViewer/
+│  ├─ TypographyFontFileViewer.csproj
 │  ├─ app.manifest                  (PerMonitorV2 DPI, longPathAware)
 │  ├─ App.xaml / App.xaml.cs        (args parsing, global exception handler)
 │  ├─ MainWindow.xaml / .cs
@@ -414,12 +414,12 @@ SimpleFontViewer/
 │  ├─ Views/     FontListView.xaml, PreviewView.xaml, GalleryView.xaml,
 │  │             GlyphMapView.xaml, InfoView.xaml
 │  └─ Controls/  FontRenderImage.cs   (Image that requests/cancels its own render)
-└─ tests/SimpleFontViewer.Tests/
-   ├─ SimpleFontViewer.Tests.csproj  (xUnit)
+└─ tests/TypographyFontFileViewer.Tests/
+   ├─ TypographyFontFileViewer.Tests.csproj  (xUnit)
    └─ (tests listed in Section 13)
 ```
 
-### 11.2 `SimpleFontViewer.csproj`
+### 11.2 `TypographyFontFileViewer.csproj`
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -430,7 +430,7 @@ SimpleFontViewer/
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyName>SimpleFontViewer</AssemblyName>
+    <AssemblyName>TypographyFontFileViewer</AssemblyName>
     <Version>1.0.0</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -458,12 +458,12 @@ Claude Code: replace each `*` with the current latest **stable** version and pin
 
 ```bat
 @echo off
-dotnet publish src\SimpleFontViewer\SimpleFontViewer.csproj -c Release -o publish
+dotnet publish src\TypographyFontFileViewer\TypographyFontFileViewer.csproj -c Release -o publish
 echo.
-echo Output: publish\SimpleFontViewer.exe
+echo Output: publish\TypographyFontFileViewer.exe
 ```
 
-Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb` must not appear because symbols are embedded). Then zip it as `SimpleFontViewer-v1.0.zip` with `README.md` and `CHANGELOG.txt`.
+Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; a `.pdb` must not appear because symbols are embedded). Then zip it as `TypographyFontFileViewer-v1.0.zip` with `README.md` and `CHANGELOG.txt`.
 
 ---
 
@@ -474,7 +474,7 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 ### Phase 0: Scaffold & de-risk (the most important phase)
 - Create the solution, csproj, manifest, empty MainWindow, and test project. Add the NuGet packages.
 - **Spike:** load `C:\Windows\Fonts\arial.ttf` with FreeTypeSharp, shape "Hello" with HarfBuzzSharp, rasterize to BGRA, and show it in a WPF `Image`.
-- Run `publish.bat`. Copy **only** the exe to a different folder (for example, `%USERPROFILE%\Desktop\sfv-test\`) and run it. "Hello" must render.
+- Run `publish.bat`. Copy **only** the exe to a different folder (for example, `%USERPROFILE%\Desktop\tffv-test\`) and run it. "Hello" must render.
 - ✅ Done when: the single exe runs from an empty folder and renders text through FreeType and HarfBuzz.
 
 ### Phase 1: Font engine core
@@ -508,7 +508,7 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 
 ### Phase 7: Search, subfolders, settings, polish
 - Search filter (file name, family, style; case-insensitive; updates as you type). Subfolders toggle with rescan, sort options, recent folders, and settings persistence (Section 10).
-- Global exception handler that logs to `SimpleFontViewer.log` next to the exe and shows a friendly message.
+- Global exception handler that logs to `TypographyFontFileViewer.log` next to the exe and shows a friendly message.
 - ✅ Done when: every setting survives a restart and search on 1,000 fonts feels instant.
 
 ### Phase 8: Hardening
@@ -516,7 +516,7 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 - ✅ Done when: no crash, hang or file lock appears in any stress case.
 
 ### Phase 9: Release
-- Final `publish.bat`, a test of the exe from an empty folder, README (features, shortcuts, supported formats, "Open with" steps, where favorites go), CHANGELOG, and `SimpleFontViewer-v1.0.zip`.
+- Final `publish.bat`, a test of the exe from an empty folder, README (features, shortcuts, supported formats, "Open with" steps, where favorites go), CHANGELOG, and `TypographyFontFileViewer-v1.0.zip`.
 - Report the exe size and cold-start time.
 
 ---
@@ -560,7 +560,7 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 
 ## 14. Acceptance Checklist
 
-- [ ] One `SimpleFontViewer.exe` runs on a PC with no .NET installed.
+- [ ] One `TypographyFontFileViewer.exe` runs on a PC with no .NET installed.
 - [ ] Opens TTF, OTF, TTC, OTC, WOFF, WOFF2, PFB/PFA, FON/FNT, BDF, PCF, DFONT.
 - [ ] Opening one font lists every font in its folder. Scrolling or Ctrl+↓/↑ moves through all of them.
 - [ ] The All Fonts tab shows every font rendered in its own face.
@@ -572,8 +572,8 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 - [ ] Search + subfolder toggle.
 - [ ] Bad files show ⚠ and never crash the app.
 - [ ] No files locked while viewing.
-- [ ] Settings and favorites persist in `SimpleFontViewer.json` next to the exe.
-- [ ] README, CHANGELOG.txt, `SimpleFontViewer-v1.0.zip` delivered.
+- [ ] Settings and favorites persist in `TypographyFontFileViewer.json` next to the exe.
+- [ ] README, CHANGELOG.txt, `TypographyFontFileViewer-v1.0.zip` delivered.
 
 ---
 
@@ -595,5 +595,5 @@ Final deliverable folder: `publish\SimpleFontViewer.exe` (only the exe; a `.pdb`
 
 - **Versioning:** the app starts at **v1.0**. Every change bumps the version (v1.1, v1.2 …) in the csproj, the title bar/status bar, and the zip name.
 - **Changelog:** one rolling `CHANGELOG.txt`, with a table of contents at the top and a heading per version. Every entry records **what** changed, **why**, and **how**.
-- **Deliverables:** always provide the full set of files plus a named zip (`SimpleFontViewer-vX.Y.zip`), even if only one file changed.
+- **Deliverables:** always provide the full set of files plus a named zip (`TypographyFontFileViewer-vX.Y.zip`), even if only one file changed.
 - **Licenses:** only free, open-source NuGet packages (MIT or similar). List each package and its license in the README. FreeType is used under the FreeType License (FTL). Include its credit line in the README and in Help → About.

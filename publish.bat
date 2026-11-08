@@ -1,5 +1,5 @@
 @echo off
-rem Simple Font Viewer - self-contained single-file publish (win-x64)
-dotnet publish src\SimpleFontViewer\SimpleFontViewer.csproj -c Release -o publish
+rem Typography Font File Viewer - self-contained single-file publish (win-x64)
+dotnet publish src\TypographyFontFileViewer\TypographyFontFileViewer.csproj -c Release -o publish
 echo.
-echo Output: publish\SimpleFontViewer.exe
+echo Output: publish\TypographyFontFileViewer.exe

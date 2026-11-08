@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>TypographyFontFileViewer</AssemblyName>
+    <RootNamespace>TypographyFontFileViewer</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>Typography Font File Viewer</Product>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Stand-alone single exe -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    HarfBuzzSharp's native assets package ships a 22 MB libHarfBuzzSharp.pdb that
+    publish copies next to the exe. Symbols are embedded in the exe already, and the
+    deliverable is meant to be one file, so drop every .pdb from the publish set.
+  -->
+  <Target Name="RemovePdbsFromPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish
+        Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <!-- MIT. Ships runtimes/win-x64/native/freetype.dll. -->
+    <PackageReference Include="FreeTypeSharp" Version="3.1.0" />
+    <!-- MIT. The managed binding; the native library comes from the NativeAssets package. -->
+    <PackageReference Include="HarfBuzzSharp" Version="14.4.0" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Win32" Version="14.4.0" />
+    <!-- MIT. ObservableObject / RelayCommand. -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+</Project>

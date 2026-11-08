@@ -1,0 +1,20 @@
+# Normalize to LF in the repository; Git checks out what each platform expects.
+* text=auto
+
+# Windows tooling needs CRLF on disk.
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.slnx    text eol=crlf
+*.sln     text eol=crlf
+*.csproj  text eol=crlf
+*.manifest text eol=crlf
+
+# Never touch binaries.
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.ttc   binary
+*.woff  binary
+*.woff2 binary
+*.pfb   binary
+*.png   binary

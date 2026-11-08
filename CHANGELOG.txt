@@ -1,26 +1,91 @@
 ================================================================================
- Simple Font Viewer - CHANGELOG
+ Typography Font File Viewer - CHANGELOG
 ================================================================================
 
 TABLE OF CONTENTS
-  v1.0.0 (unreleased) - Repository scaffold
+  v1.0.0 (unreleased)
+    - Phase 0: scaffold and de-risk
+    - Naming: Typography Font File Viewer
+    - Repository scaffold
 
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
 
+Phase 0: scaffold and de-risk
+  WHAT: The solution now builds, tests and publishes. Added
+        TypographyFontFileViewer.slnx, the app project (WPF, net10.0-windows,
+        self-contained single-file win-x64), app.manifest, a generated
+        Assets/app.ico, App.xaml(.cs), MainWindow.xaml(.cs),
+        Core/FontLoadException.cs, Engine/FreeTypeSpike.cs, and an xUnit v3 test
+        project with 8 passing tests.
+  WHY:  Phase 0 exists to prove the risky part before any feature work: that
+        FreeType and HarfBuzz really do run from inside a single self-contained
+        exe, on a machine with nothing installed, and that fonts can be read
+        without locking them.
+  HOW:  FreeTypeSpike reads the font fully into memory over a
+        FileShare.ReadWrite|Delete handle, pins the bytes, hands the same
+        pointer to FT_New_Memory_Face and to a HarfBuzz Blob, shapes the string
+        with HarfBuzz, rasterizes each glyph with FreeType and composites 8-bit
+        coverage (GRAY and MONO pixel modes) into a BGRA buffer. The engine
+        returns plain bytes; MainWindow builds and freezes the BitmapSource, so
+        no native handle and no WPF object ever cross the boundary.
+
+  VERIFIED:
+        - 8/8 tests pass: face summary, ink present, size scaling, blank text,
+          no file lock (the file is deleted while "open"), and garbage, empty
+          and missing files all raising FontLoadException rather than crashing.
+        - publish.bat produces ONE file: publish\TypographyFontFileViewer.exe,
+          60.2 MB (63,109,298 bytes).
+        - That exe, alone in an empty folder, renders "Hello" in Arial Regular
+          (4,652 glyphs), 5 characters shaped into 5 glyphs by HarfBuzz.
+        - Per-Monitor V2 works: 72 pt at 120 DPI resolved to 120 px.
+        - Time to window: 826 ms first run (includes self-extraction), then
+          741 ms and 604 ms. Target is under 2 s.
+        - The app wrote nothing beside the exe.
+
+  PACKAGES (all MIT, pinned):
+        FreeTypeSharp 3.1.0 (the main package, not the McEndu fork; it ships
+        runtimes/win-x64/native/freetype.dll), HarfBuzzSharp 14.4.0 with
+        HarfBuzzSharp.NativeAssets.Win32 14.4.0, CommunityToolkit.Mvvm 8.4.2.
+        Tests: xunit.v3 4.0.2, xunit.runner.visualstudio 4.0.1.
+
+  DEVIATIONS FROM THE BLUEPRINT (Section 11), and why:
+        - The solution is TypographyFontFileViewer.slnx, not .sln. The .NET 10
+          SDK emits the XML solution format by default; Visual Studio 2022
+          17.14+ and Rider both read it.
+        - Added global.json with the test runner set to
+          Microsoft.Testing.Platform. xUnit v3 runs on that platform, and the
+          .NET 10 SDK refuses to run it through dotnet test without this opt-in.
+        - Added a RemovePdbsFromPublish target to the csproj. The HarfBuzz
+          native assets package drops a 22.8 MB libHarfBuzzSharp.pdb into the
+          publish folder, and the deliverable must be the exe alone.
+        - The test project sets SelfContained=true to match the app project; a
+          self-contained exe cannot be referenced by a framework-dependent one
+          (NETSDK1151).
+
+  NOT YET DONE: Engine/FreeTypeSpike.cs is scaffolding for this phase only.
+        Phase 1 replaces it with FontEngine, FaceCache, TextLayout,
+        GlyphRasterizer and MetadataReader, and adds the remaining pixel modes
+        (GRAY2/GRAY4/LCD/BGRA), TTC face enumeration and Type 1 companions.
+
+Naming: Typography Font File Viewer
+  WHAT: Renamed the app, the assembly, the exe, the settings file, the project
+        folders and the GitHub repository from "Simple Font Viewer" to
+        "Typography Font File Viewer" (repo: typography-font-file-viewer).
+  WHY:  The project's chosen name.
+  HOW:  Renamed the blueprint and project folders, replaced the name and the
+        SimpleFontViewer identifier across every document, and renamed the
+        GitHub repository. The blueprint's reference to the unrelated "Simple
+        Rich Text Editor" was deliberately left alone.
+
 Repository scaffold
   WHAT: Created the public git repository: blueprint document, README, this
-        changelog, .gitignore, publish.bat, and the empty folder tree from
-        Section 11.1 of the blueprint. No application code yet.
+        changelog, .gitignore, publish.bat, MIT license, and the folder tree
+        from Section 11.1 of the blueprint.
   WHY:  The build runs phase by phase (blueprint Section 12). The repository,
         its conventions and its ignore rules have to exist before Phase 0 so
         every phase can commit into a clean history.
-  HOW:  `git init`; files written from the blueprint's Sections 10, 11 and 16;
-        folder placeholders (.gitkeep) for Core/, Engine/, Services/,
-        ViewModels/, Views/, Controls/, Assets/ and tests/.
-
-  NOT YET DONE: Phase 0 (scaffold & de-risk) onward - solution, csproj,
-        app.manifest, NuGet packages (FreeTypeSharp, HarfBuzzSharp,
-        CommunityToolkit.Mvvm, pinned to current stable), and the
-        FreeType + HarfBuzz rendering spike.
+  HOW:  git init; files written from the blueprint's Sections 10, 11 and 16.
+        .gitignore excludes build output, every .pdb, the downloaded test fonts
+        in tests/fonts/, and the files the portable app writes next to the exe.

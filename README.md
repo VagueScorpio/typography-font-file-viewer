@@ -1,12 +1,13 @@
-# Simple Font Viewer
+# Typography Font File Viewer
 
 A lightweight, portable Windows font viewer that ships as **one stand-alone `.exe`**.
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: pre-Phase 0.** This repository currently holds the blueprint, the build
-> conventions and the folder outline. The application itself has not been built yet.
-> See [Roadmap](#roadmap) and [the blueprint](docs/Simple-Font-Viewer-Blueprint-v1.0.md).
+> **Status: Phase 0 complete.** The solution builds, the tests pass, and the published
+> exe renders text through FreeType and HarfBuzz from a folder containing nothing but
+> itself. The font engine, folder browsing and the four tabs are still to come — see
+> [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ---
 
@@ -73,7 +74,7 @@ The app writes nothing to the registry, so file associations stay yours to set:
 1. Right-click a `.ttf` (or any font file) in Explorer.
 2. **Open with**, then **Choose another app**.
 3. Pick **More apps**, then **Look for another app on this PC**, and browse to
-   `SimpleFontViewer.exe`.
+   `TypographyFontFileViewer.exe`.
 4. Tick **Always use this app to open .ttf files**.
 
 Repeat for each extension you want to claim.
@@ -83,9 +84,9 @@ Repeat for each extension you want to claim.
 Everything the app keeps lives next to the exe:
 
 ```
-SimpleFontViewer.exe
-SimpleFontViewer.json        <- settings + favorites index (created on first run)
-SimpleFontViewer.log         <- only if an unhandled error occurs
+TypographyFontFileViewer.exe
+TypographyFontFileViewer.json        <- settings + favorites index (created on first run)
+TypographyFontFileViewer.log         <- only if an unhandled error occurs
 Favorite Fonts\              <- created on your first favorite
 ```
 
@@ -101,10 +102,24 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) on Windows.
 publish.bat
 ```
 
-Output: `publish\SimpleFontViewer.exe` — a self-contained, single-file `win-x64`
+Output: `publish\TypographyFontFileViewer.exe` — a self-contained, single-file `win-x64`
 build with the runtime, WPF and the native FreeType / HarfBuzz libraries packed
 inside. Symbols are embedded, so no `.pdb` ships beside the exe. Expect an exe of
-tens of MB; that is the cost of running with nothing installed.
+tens of MB; that is the cost of running with nothing installed. As of Phase 0 it is
+60.2 MB and reaches a window in well under a second.
+
+To build and test during development:
+
+```bat
+dotnet build TypographyFontFileViewer.slnx
+```
+
+```bat
+dotnet test --solution TypographyFontFileViewer.slnx
+```
+
+The tests run on Microsoft.Testing.Platform rather than VSTest, which the .NET 10 SDK
+requires a project to opt into; `global.json` does that for the whole repository.
 
 ## Architecture at a glance
 
@@ -137,7 +152,7 @@ Three decisions carry most of the design:
   you can delete, rename or un-favorite a font while it is on screen.
 
 Full detail — module specs, the WOFF2 decoder, the favorites matching rules — is in
-[the blueprint](docs/Simple-Font-Viewer-Blueprint-v1.0.md).
+[the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ## Roadmap
 
@@ -146,8 +161,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Scaffold and de-risk: solution, csproj, manifest, NuGet, FreeType + HarfBuzz spike, single-file publish | Not started |
-| 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | Not started |
+| 0 | Scaffold and de-risk: solution, csproj, manifest, NuGet, FreeType + HarfBuzz spike, single-file publish | **Done** |
+| 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | Next |
 | 2 | WOFF and WOFF2 managed decoders | Not started |
 | 3 | Folder browsing and Preview tab | Not started |
 | 4 | All Fonts gallery (virtualized, 1,000+ fonts) | Not started |
@@ -162,14 +177,16 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 ```
 docs/                             Blueprint and design documents
 publish.bat                       Single-file release build
-src/SimpleFontViewer/
+global.json                       Opts the repo into the Microsoft.Testing.Platform runner
+TypographyFontFileViewer.slnx     Solution (the .NET 10 SDK's XML solution format)
+src/TypographyFontFileViewer/
   Core/                           Formats, sniffer, FaceKey, FontInfo, exceptions
   Engine/                         Engine thread, FaceCache, layout, rasterizer, metadata
   Engine/Woff/                    WOFF 1.0 / WOFF 2.0 decoders, SFNT writer
   Services/                       Render, scan, favorites, settings, hashing
   ViewModels/  Views/  Controls/  WPF MVVM layer
   Assets/                         Application icon
-tests/SimpleFontViewer.Tests/     xUnit tests
+tests/TypographyFontFileViewer.Tests/     xUnit tests
 tests/fonts/                      Local test fonts (git-ignored)
 ```
 

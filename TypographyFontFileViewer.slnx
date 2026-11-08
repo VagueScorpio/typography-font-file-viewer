@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TypographyFontFileViewer/TypographyFontFileViewer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TypographyFontFileViewer.Tests/TypographyFontFileViewer.Tests.csproj" />
+  </Folder>
+</Solution>

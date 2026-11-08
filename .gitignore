@@ -28,10 +28,10 @@ tests/fonts/*
 !tests/fonts/README.md
 
 # ---- Runtime files the app creates next to the exe (portable app) ----
-SimpleFontViewer.json
-SimpleFontViewer.json.bad
-SimpleFontViewer.json.tmp
-SimpleFontViewer.log
+TypographyFontFileViewer.json
+TypographyFontFileViewer.json.bad
+TypographyFontFileViewer.json.tmp
+TypographyFontFileViewer.log
 Favorite Fonts/
 
 # ---- OS cruft ----
