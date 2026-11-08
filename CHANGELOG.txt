@@ -1,0 +1,26 @@
+================================================================================
+ Simple Font Viewer - CHANGELOG
+================================================================================
+
+TABLE OF CONTENTS
+  v1.0.0 (unreleased) - Repository scaffold
+
+--------------------------------------------------------------------------------
+ v1.0.0 (unreleased)
+--------------------------------------------------------------------------------
+
+Repository scaffold
+  WHAT: Created the public git repository: blueprint document, README, this
+        changelog, .gitignore, publish.bat, and the empty folder tree from
+        Section 11.1 of the blueprint. No application code yet.
+  WHY:  The build runs phase by phase (blueprint Section 12). The repository,
+        its conventions and its ignore rules have to exist before Phase 0 so
+        every phase can commit into a clean history.
+  HOW:  `git init`; files written from the blueprint's Sections 10, 11 and 16;
+        folder placeholders (.gitkeep) for Core/, Engine/, Services/,
+        ViewModels/, Views/, Controls/, Assets/ and tests/.
+
+  NOT YET DONE: Phase 0 (scaffold & de-risk) onward - solution, csproj,
+        app.manifest, NuGet packages (FreeTypeSharp, HarfBuzzSharp,
+        CommunityToolkit.Mvvm, pinned to current stable), and the
+        FreeType + HarfBuzz rendering spike.

@@ -1,0 +1,40 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+publish/
+*.zip
+
+# ---- Visual Studio / Rider / VS Code ----
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# ---- Debug symbols (symbols are embedded; a .pdb must never ship) ----
+*.pdb
+
+# ---- Test fonts (licensed material, downloaded locally; see docs blueprint 13.1) ----
+tests/fonts/*
+!tests/fonts/.gitkeep
+!tests/fonts/README.md
+
+# ---- Runtime files the app creates next to the exe (portable app) ----
+SimpleFontViewer.json
+SimpleFontViewer.json.bad
+SimpleFontViewer.json.tmp
+SimpleFontViewer.log
+Favorite Fonts/
+
+# ---- OS cruft ----
+Thumbs.db
+desktop.ini
+.DS_Store
