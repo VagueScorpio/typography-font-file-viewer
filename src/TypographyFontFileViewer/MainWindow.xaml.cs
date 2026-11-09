@@ -1,202 +1,157 @@
-using System.Diagnostics;
 using System.IO;
-using System.Text;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 using TypographyFontFileViewer.Core;
 using TypographyFontFileViewer.Services;
+using TypographyFontFileViewer.ViewModels;
 
 namespace TypographyFontFileViewer;
 
 public partial class MainWindow : Window
 {
-    private const string SampleText =
-        "The quick brown fox jumps over the lazy dog. " +
-        "Pack my box with five dozen liquor jugs.";
-
-    private const double SamplePointSize = 36;
-
     private readonly RenderService _renderService = new();
-    private CancellationTokenSource? _pendingRender;
-    private bool _loaded;
+    private readonly MainViewModel _model;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        _model = new MainViewModel(_renderService)
+        {
+            PickFontFile = PickFontFile,
+            PickFolder = PickFolder,
+        };
+
+        DataContext = _model;
+
         Loaded += OnLoaded;
-        DpiChanged += (_, _) => _ = ShowFontAsync();
+        DpiChanged += (_, _) => UpdateDpi();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        _loaded = true;
-        await ShowFontAsync();
-    }
+        UpdateDpi();
 
-    /// <summary>Re-wraps the preview when the window is resized.</summary>
-    private void OnViewportSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        if (_loaded && e.WidthChanged) _ = ShowFontAsync();
+        // Double-clicking a font in Explorer starts the app with that file.
+        if (App.StartupPath is { Length: > 0 } startup)
+            await _model.OpenPathAsync(startup);
     }
 
     /// <summary>
-    /// Drives the whole engine once: open a font, read its metadata, lay text out, and
-    /// show the pixels that come back.
+    /// Tells the preview which monitor it is on, so a point size is a real point size.
     /// </summary>
-    private async Task ShowFontAsync()
+    private void UpdateDpi()
+        => _model.Preview.Dpi = VisualTreeHelper.GetDpi(this).PixelsPerInchX;
+
+    // --- Dialogs ---------------------------------------------------------------
+
+    private string? PickFontFile()
     {
-        // A new request supersedes whatever was in flight.
-        CancellationTokenSource request = new();
-        CancellationTokenSource? previous = Interlocked.Exchange(ref _pendingRender, request);
-        previous?.Cancel();
-        previous?.Dispose();
-
-        CancellationToken cancellationToken = request.Token;
-        var timer = Stopwatch.StartNew();
-        string fontPath = FindSampleFont();
-
-        try
+        var dialog = new OpenFileDialog
         {
-            await _renderService.Ready;
+            Title = "Open a font",
+            Filter = BuildFilter(),
+            CheckFileExists = true,
+            Multiselect = false,
+            InitialDirectory = _model.CurrentFolder,
+        };
 
-            FaceSummary[] summaries = await _renderService.ReadSummariesAsync(
-                fontPath, JobPriority.High, cancellationToken);
-
-            FaceSummary summary = summaries[0];
-            if (summary.IsBroken)
-            {
-                ShowFailure(fontPath, summary.Error ?? "Unknown error.");
-                return;
-            }
-
-            double dpi = VisualTreeHelper.GetDpi(this).PixelsPerInchX;
-            int wrapWidth = Math.Max(120, (int)((ActualWidth - 80) * dpi / 96.0));
-
-            var key = FaceKey.For(fontPath, summary.FaceIndex);
-
-            RenderedText rendered = await _renderService.RenderTextAsync(
-                key, SampleText, SamplePointSize, dpi, wrapWidth,
-                RenderStyle.Light, JobPriority.High, cancellationToken);
-
-            FontInfo info = await _renderService.ReadInfoAsync(
-                key, JobPriority.High, cancellationToken);
-
-            if (cancellationToken.IsCancellationRequested) return;
-
-            // The engine hands over bytes; the UI thread owns every WPF object.
-            var source = BitmapSource.Create(
-                rendered.Width, rendered.Height, dpi, dpi,
-                PixelFormats.Bgra32, null, rendered.Bgra, rendered.Stride);
-            source.Freeze();
-
-            PreviewImage.Source = source;
-            ErrorText.Visibility = Visibility.Collapsed;
-
-            SubtitleText.Text =
-                $"{summary.DisplayName} · {summary.Format.Badge()} · {summary.GlyphCount:N0} glyphs · " +
-                $"{rendered.GlyphCount} glyphs shaped onto {rendered.LineCount} line" +
-                (rendered.LineCount == 1 ? "" : "s");
-
-            DetailsText.Text = Describe(info, rendered);
-
-            (int count, long bytes, int hits, int misses, _) = _renderService.CacheStatistics;
-            StatusText.Text =
-                $"{Path.GetFileName(fontPath)} · FreeType {_renderService.NativeVersion} · " +
-                $"{SamplePointSize:0} pt at {dpi:0} DPI = {RenderService.ToPixelSize(SamplePointSize, dpi)} px · " +
-                $"{timer.ElapsedMilliseconds} ms · cache {count} faces, {bytes / 1024 / 1024} MB, " +
-                $"{hits} hits / {misses} misses";
-        }
-        catch (OperationCanceledException)
-        {
-            // Superseded by a newer request; the newer one owns the UI now.
-        }
-        catch (Exception exception)
-        {
-            ShowFailure(fontPath, $"{exception.GetType().Name}: {exception.Message}");
-        }
+        return dialog.ShowDialog(this) == true ? dialog.FileName : null;
     }
 
-    private static string Describe(FontInfo info, RenderedText rendered)
+    private string? PickFolder()
     {
-        var text = new StringBuilder();
-
-        void Line(string label, string? value)
+        var dialog = new OpenFolderDialog
         {
-            if (!string.IsNullOrWhiteSpace(value))
-                text.AppendLine($"{label,-16}{value}");
-        }
+            Title = "Open a folder of fonts",
+            Multiselect = false,
+            InitialDirectory = _model.CurrentFolder,
+        };
 
-        Line("Outline format", info.OutlineFormat);
-        Line("Full name", info.FullName);
-        Line("Version", info.Version);
-        Line("PostScript", info.PostScriptName);
-        Line("Designer", info.Designer);
-        Line("Manufacturer", info.Manufacturer);
-        Line("Embedding", info.Embedding.ToString());
-        Line("Units per em", info.UnitsPerEm.ToString());
-        Line("Mapped chars", $"{info.MappedCharacterCount:N0} of {info.GlyphCount:N0} glyphs");
-        Line("Charmaps", info.CharmapCount.ToString());
-        Line("Kerning", info.HasKerning ? "yes" : "no");
-        Line("Glyph names", info.HasGlyphNames ? "yes" : "no");
-        Line("Colour", info.HasColor ? "yes" : "no");
-
-        if (info.FixedSizes.Count > 0)
-            Line("Fixed sizes", string.Join(", ", info.FixedSizes));
-
-        if (info.VariationAxes.Count > 0)
-        {
-            Line("Variable", $"{info.VariationAxes.Count} axes, {info.NamedInstances.Count} named instances");
-            foreach (VariationAxis axis in info.VariationAxes)
-                Line("  axis", axis.ToString());
-        }
-
-        Line("Copyright", Shorten(info.Copyright, 120));
-        Line("Licence", Shorten(info.License, 120));
-
-        if (rendered.HasMissingGlyphs)
-            Line("Note", "some characters had no glyph and were drawn as .notdef");
-
-        return text.ToString().TrimEnd();
+        return dialog.ShowDialog(this) == true ? dialog.FolderName : null;
     }
 
-    private static string? Shorten(string? value, int limit)
+    /// <summary>Builds the file dialog's filter from the formats the app actually opens.</summary>
+    private static string BuildFilter()
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
+        const string All =
+            "*.ttf;*.otf;*.ttc;*.otc;*.woff;*.woff2;*.pfb;*.pfa;*.fon;*.fnt;*.bdf;*.pcf;*.dfont";
 
-        string collapsed = value.ReplaceLineEndings(" ").Trim();
-        return collapsed.Length <= limit ? collapsed : collapsed[..limit] + "…";
+        return string.Join("|",
+        [
+            $"All fonts|{All}",
+            "TrueType and OpenType|*.ttf;*.otf;*.ttc;*.otc",
+            "Web fonts|*.woff;*.woff2",
+            "PostScript Type 1|*.pfb;*.pfa",
+            "Bitmap fonts|*.fon;*.fnt;*.bdf;*.pcf",
+            "All files|*.*",
+        ]);
     }
 
-    private void ShowFailure(string fontPath, string message)
+    // --- Drag and drop ---------------------------------------------------------
+
+    private void OnDragOver(object sender, DragEventArgs e)
     {
-        PreviewImage.Source = null;
-        DetailsText.Text = string.Empty;
-        SubtitleText.Text = "The engine could not open this font.";
-        ErrorText.Text = $"{fontPath}\n\n{message}";
-        ErrorText.Visibility = Visibility.Visible;
-        StatusText.Text = "Failed — see the message above.";
+        e.Effects = GetDroppedPath(e) is not null ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
     }
 
-    /// <summary>Picks a font that exists on every Windows machine.</summary>
-    private static string FindSampleFont()
+    private async void OnDrop(object sender, DragEventArgs e)
     {
-        string fontsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-        foreach (string candidate in new[] { "arial.ttf", "segoeui.ttf", "tahoma.ttf", "verdana.ttf" })
+        string? path = GetDroppedPath(e);
+        e.Handled = true;
+
+        if (path is not null) await _model.OpenPathAsync(path);
+    }
+
+    /// <summary>
+    /// The first thing worth opening out of a drop: a folder, or a font file.
+    /// </summary>
+    /// <remarks>
+    /// Dropping several files is treated as dropping the first one, since opening any
+    /// font opens its whole folder anyway.
+    /// </remarks>
+    private static string? GetDroppedPath(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return null;
+
+        foreach (string path in paths)
         {
-            string path = Path.Combine(fontsFolder, candidate);
-            if (File.Exists(path)) return path;
+            if (Directory.Exists(path)) return path;
+            if (File.Exists(path) && FormatSniffer.IsSupportedFileName(Path.GetFileName(path)))
+                return path;
         }
 
-        string? any = Directory.EnumerateFiles(fontsFolder, "*.ttf").FirstOrDefault();
-        return any ?? Path.Combine(fontsFolder, "arial.ttf");
+        return null;
+    }
+
+    // --- Menu ------------------------------------------------------------------
+
+    private void OnBiggerClick(object sender, RoutedEventArgs e) => _model.Preview.AdjustSize(2);
+
+    private void OnSmallerClick(object sender, RoutedEventArgs e) => _model.Preview.AdjustSize(-2);
+
+    private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    private void OnAboutClick(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            this,
+            "Typography Font File Viewer 1.0\n\n" +
+            "A portable font viewer. Nothing is installed and nothing is written to the registry.\n\n" +
+            $"Rendering by FreeType {_renderService.NativeVersion}, shaping by HarfBuzz.\n\n" +
+            "Portions of this software are copyright © 2026 The FreeType Project\n" +
+            "(www.freetype.org). All rights reserved.",
+            "About Typography Font File Viewer",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        _pendingRender?.Cancel();
-        _pendingRender?.Dispose();
+        _model.Dispose();
         _renderService.Dispose();
         base.OnClosed(e);
     }

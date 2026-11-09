@@ -1,11 +1,16 @@
 <Application x:Class="TypographyFontFileViewer.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:TypographyFontFileViewer.Controls"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <!-- The app chrome uses the system font; only previews render through FreeType. -->
         <SolidColorBrush x:Key="PanelBackground" Color="#FFF7F7F5" />
         <SolidColorBrush x:Key="PanelBorder" Color="#FFD8D8D2" />
         <SolidColorBrush x:Key="MutedText" Color="#FF5C6670" />
+
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+        <controls:NullToVisibilityConverter x:Key="NullToVisibility" />
+        <controls:EmptyToVisibilityConverter x:Key="EmptyToVisibility" />
     </Application.Resources>
 </Application>

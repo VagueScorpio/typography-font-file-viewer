@@ -1,0 +1,144 @@
+<UserControl x:Class="TypographyFontFileViewer.Views.PreviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TypographyFontFileViewer.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance Type=vm:PreviewViewModel}"
+             mc:Ignorable="d">
+
+    <DockPanel>
+
+        <!-- Controls -->
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource PanelBackground}"
+                BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="Text" VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                <TextBox Grid.Row="0" Grid.Column="1"
+                         x:Name="PreviewTextBox"
+                         Text="{Binding PreviewText, UpdateSourceTrigger=PropertyChanged, Delay=0}"
+                         VerticalAlignment="Center" />
+
+                <ComboBox Grid.Row="0" Grid.Column="2"
+                          x:Name="PresetBox"
+                          Width="130" Margin="8,0,0,0"
+                          ItemsSource="{x:Static vm:PreviewViewModel.Presets}"
+                          SelectionChanged="OnPresetChanged"
+                          VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Text="Size" VerticalAlignment="Center" Margin="0,8,8,0" />
+
+                <StackPanel Grid.Row="1" Grid.Column="1"
+                            Orientation="Horizontal" Margin="0,8,0,0">
+                    <Slider x:Name="SizeSlider"
+                            Width="260"
+                            Minimum="6" Maximum="288"
+                            Value="{Binding PointSize, Mode=TwoWay}"
+                            IsSnapToTickEnabled="True" TickFrequency="1"
+                            VerticalAlignment="Center" />
+
+                    <TextBox Width="52" Margin="10,0,4,0"
+                             VerticalAlignment="Center"
+                             TextAlignment="Right"
+                             KeyDown="OnSizeBoxKeyDown"
+                             Text="{Binding PointSize, Mode=TwoWay, StringFormat={}{0:0}, UpdateSourceTrigger=LostFocus}" />
+
+                    <TextBlock Text="pt" VerticalAlignment="Center"
+                               Foreground="{StaticResource MutedText}" />
+
+                    <TextBlock Margin="16,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource MutedText}"
+                               Text="{Binding FixedSizeNotice}" />
+                </StackPanel>
+
+                <CheckBox Grid.Row="1" Grid.Column="2"
+                          Content="Dark background"
+                          Margin="8,8,0,0"
+                          VerticalAlignment="Center"
+                          IsChecked="{Binding DarkBackground, Mode=TwoWay}" />
+            </Grid>
+        </Border>
+
+        <!-- Waterfall: the same text at a ladder of sizes. -->
+        <Border DockPanel.Dock="Bottom"
+                BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="0,1,0,0"
+                MaxHeight="260"
+                Background="{Binding PreviewBackground}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Waterfall}" Margin="12,8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:WaterfallRow}">
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Label}"
+                                           FontSize="10"
+                                           TextAlignment="Right"
+                                           Margin="0,0,10,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="#FF9AA3AB" />
+
+                                <!-- Each line runs off the edge rather than wrapping, so
+                                     the sizes stay comparable down the ladder. -->
+                                <Grid Grid.Column="1" ClipToBounds="True">
+                                    <Image Source="{Binding Image}"
+                                           Stretch="None"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center" />
+                                </Grid>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- The main preview. -->
+        <Grid Background="{Binding PreviewBackground}">
+            <ScrollViewer x:Name="PreviewScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="12"
+                          SizeChanged="OnPreviewAreaSizeChanged"
+                          PreviewMouseWheel="OnPreviewMouseWheel">
+                <Image Source="{Binding MainImage}"
+                       Stretch="None"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Top" />
+            </ScrollViewer>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Margin="16"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Top"
+                       Foreground="#FFB3261E"
+                       FontFamily="Consolas, Courier New"
+                       Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}" />
+        </Grid>
+
+    </DockPanel>
+</UserControl>

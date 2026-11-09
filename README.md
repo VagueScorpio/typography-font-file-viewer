@@ -4,12 +4,11 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 2 complete.** The font engine opens every format v1.0 promises except
-> `.dfont` — TTF, OTF, TTC, WOFF, WOFF2, Type 1, BDF, PCF and FON — shapes and wraps
-> text, rasterizes colour and bitmap glyphs, and reads full metadata, all without
-> locking a single file. What is left is the application around it: folder browsing and
-> the four tabs. See [Roadmap](#roadmap) and
-> [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
+> **Status: Phase 3 complete — the app runs.** Open a font and the whole folder loads
+> beside it; scroll or press `Ctrl+Down` to walk through every font, with custom preview
+> text, a size slider and a waterfall. Every format v1.0 promises opens except `.dfont`.
+> Still to come: the All Fonts gallery, favourites, the glyph map and the Info tab. See
+> [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ---
 
@@ -189,8 +188,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 0 | Scaffold and de-risk: solution, csproj, manifest, NuGet, FreeType + HarfBuzz spike, single-file publish | **Done** |
 | 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | **Done** |
 | 2 | WOFF and WOFF2 managed decoders | **Done** |
-| 3 | Folder browsing and Preview tab | Next |
-| 4 | All Fonts gallery (virtualized, 1,000+ fonts) | Not started |
+| 3 | Folder browsing and Preview tab | **Done** |
+| 4 | All Fonts gallery (virtualized, 1,000+ fonts) | Next |
 | 5 | Favorites (copy, Recycle Bin, hash matching) | Not started |
 | 6 | Glyphs and Info tabs | Not started |
 | 7 | Search, subfolders, settings persistence, polish | Not started |

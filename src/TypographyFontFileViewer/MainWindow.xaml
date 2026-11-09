@@ -1,71 +1,149 @@
 <Window x:Class="TypographyFontFileViewer.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:TypographyFontFileViewer.Views"
+        xmlns:vm="clr-namespace:TypographyFontFileViewer.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
+        mc:Ignorable="d"
         Title="Typography Font File Viewer 1.0"
-        Height="560" Width="900"
-        MinHeight="360" MinWidth="560"
+        Height="680" Width="1080"
+        MinHeight="420" MinWidth="720"
         Background="White"
+        AllowDrop="True"
+        Drop="OnDrop"
+        DragOver="OnDragOver"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
         WindowStartupLocation="CenterScreen">
 
+    <Window.InputBindings>
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenFileCommand}" />
+        <KeyBinding Key="O" Modifiers="Control+Shift" Command="{Binding OpenFolderCommand}" />
+        <!-- Next and previous work from anywhere, including inside the text box. -->
+        <KeyBinding Key="Down" Modifiers="Control" Command="{Binding NextFontCommand}" />
+        <KeyBinding Key="Up" Modifiers="Control" Command="{Binding PreviousFontCommand}" />
+        <KeyBinding Key="Home" Modifiers="Control" Command="{Binding FirstFontCommand}" />
+        <KeyBinding Key="End" Modifiers="Control" Command="{Binding LastFontCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
+    </Window.InputBindings>
+
     <DockPanel>
 
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open Font…" InputGestureText="Ctrl+O"
+                          Command="{Binding OpenFileCommand}" />
+                <MenuItem Header="Open _Folder…" InputGestureText="Ctrl+Shift+O"
+                          Command="{Binding OpenFolderCommand}" />
+                <Separator />
+                <MenuItem Header="_Rescan folder" InputGestureText="F5"
+                          Command="{Binding RescanCommand}" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Next font" InputGestureText="Ctrl+Down"
+                          Command="{Binding NextFontCommand}" />
+                <MenuItem Header="_Previous font" InputGestureText="Ctrl+Up"
+                          Command="{Binding PreviousFontCommand}" />
+                <Separator />
+                <MenuItem Header="_Bigger" InputGestureText="Ctrl+=" Click="OnBiggerClick" />
+                <MenuItem Header="_Smaller" InputGestureText="Ctrl+-" Click="OnSmallerClick" />
+                <Separator />
+                <MenuItem Header="_Dark preview background"
+                          IsCheckable="True"
+                          IsChecked="{Binding Preview.DarkBackground, Mode=TwoWay}" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About…" Click="OnAboutClick" />
+            </MenuItem>
+        </Menu>
+
+        <ToolBarTray DockPanel.Dock="Top">
+            <ToolBar>
+                <Button Content="Open…" Command="{Binding OpenFileCommand}" Padding="8,2" />
+                <Button Content="Open Folder…" Command="{Binding OpenFolderCommand}" Padding="8,2" />
+                <Separator />
+                <Button Content="Rescan" Command="{Binding RescanCommand}" Padding="8,2" />
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- Anything the app needs to tell the user that is not an error in a font:
+             a path that does not exist, a folder with nothing in it. -->
         <Border DockPanel.Dock="Top"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}"
+                Background="#FFFDF4DA"
+                BorderBrush="#FFE4CE8D"
                 BorderThickness="0,0,0,1"
-                Padding="16,12">
-            <StackPanel>
-                <TextBlock Text="Phase 1 — font engine core"
-                           FontSize="15" FontWeight="SemiBold" />
-                <TextBlock x:Name="SubtitleText"
-                           Margin="0,3,0,0"
-                           Foreground="{StaticResource MutedText}"
-                           TextWrapping="Wrap"
-                           Text="Starting the engine…" />
-            </StackPanel>
+                Padding="12,6"
+                Visibility="{Binding Message, Converter={StaticResource NullToVisibility}}">
+            <TextBlock Text="{Binding Message}"
+                       TextWrapping="Wrap"
+                       Foreground="#FF6B5A14" />
         </Border>
 
+        <!-- Status bar -->
         <Border DockPanel.Dock="Bottom"
                 Background="{StaticResource PanelBackground}"
                 BorderBrush="{StaticResource PanelBorder}"
                 BorderThickness="0,1,0,0"
-                Padding="16,7">
-            <TextBlock x:Name="StatusText"
-                       Foreground="{StaticResource MutedText}"
-                       TextTrimming="CharacterEllipsis"
-                       Text="Starting…" />
+                Padding="12,5">
+            <Grid>
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{StaticResource MutedText}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="v1.0"
+                           HorizontalAlignment="Right"
+                           Foreground="{StaticResource MutedText}" />
+            </Grid>
         </Border>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      Padding="16"
-                      SizeChanged="OnViewportSizeChanged">
-            <StackPanel>
-                <!-- Shaped by HarfBuzz, rasterized by FreeType, wrapped to this panel,
-                     handed to WPF as a frozen bitmap of plain bytes. -->
-                <Image x:Name="PreviewImage"
-                       HorizontalAlignment="Left"
-                       Stretch="None"
-                       SnapsToDevicePixels="True"
-                       RenderOptions.BitmapScalingMode="NearestNeighbor" />
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" MinWidth="200" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="320" />
+            </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="DetailsText"
-                           Margin="0,16,0,0"
-                           Foreground="{StaticResource MutedText}"
-                           TextWrapping="Wrap"
-                           FontFamily="Consolas, Courier New"
-                           LineHeight="18" />
+            <views:FontListView Grid.Column="0" DataContext="{Binding}" />
 
-                <TextBlock x:Name="ErrorText"
-                           Visibility="Collapsed"
-                           Foreground="#FFB3261E"
-                           TextWrapping="Wrap"
-                           FontFamily="Consolas, Courier New"
-                           Margin="0,8,0,0" />
-            </StackPanel>
-        </ScrollViewer>
+            <GridSplitter Grid.Column="1"
+                          Width="4"
+                          HorizontalAlignment="Stretch"
+                          Background="{StaticResource PanelBorder}" />
+
+            <DockPanel Grid.Column="2">
+
+                <!-- The selected font's name, above the tabs. -->
+                <Border DockPanel.Dock="Top"
+                        Padding="12,8"
+                        BorderBrush="{StaticResource PanelBorder}"
+                        BorderThickness="0,0,0,1">
+                    <TextBlock Text="{Binding SelectedFont.DisplayName}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                </Border>
+
+                <TabControl x:Name="Tabs" BorderThickness="0" Padding="0">
+                    <TabItem Header="Preview">
+                        <views:PreviewView DataContext="{Binding Preview}" />
+                    </TabItem>
+                </TabControl>
+            </DockPanel>
+
+            <!-- Shown before anything has been opened. -->
+            <TextBlock Grid.Column="2"
+                       Text="Open a font file or a folder to begin.&#x0a;You can also drag one onto this window."
+                       Margin="24"
+                       TextAlignment="Center"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Foreground="{StaticResource MutedText}"
+                       IsHitTestVisible="False"
+                       Visibility="{Binding Fonts.Count, Converter={StaticResource EmptyToVisibility}}" />
+        </Grid>
 
     </DockPanel>
 </Window>

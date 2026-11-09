@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 3: folder browsing and the Preview tab
     - Phase 2: WOFF and WOFF 2.0
     - Phase 1: font engine core
     - Test fonts: fonttools corpus builder
@@ -14,6 +15,76 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 3: folder browsing and the Preview tab
+  WHAT: The engine became an application. New Core/FontFile.cs (with a natural
+        file-name comparer), Services/FolderScanner.cs, the MVVM layer
+        (MainViewModel, FontItemViewModel, PreviewViewModel),
+        Views/FontListView and Views/PreviewView, Controls/Converters.cs, and a
+        rebuilt MainWindow with a menu, a toolbar, a resizable sidebar and a
+        status bar.
+  WHY:  Requirement R2: open one font and get the whole folder, so the user
+        scrolls through fonts instead of opening files one at a time. Everything
+        from Phase 1 and 2 was reachable only from tests until now.
+  HOW:  Opening a file opens its folder and selects that file. The scanner
+        touches directory entries only — no file is opened and nothing decoded —
+        so the list appears at once; a background pass at Low priority then reads
+        each file's metadata, replaces file names with family names, and expands
+        collections into one row per face. The preview debounces every change by
+        30 ms and cancels the request in flight, so holding a key costs one
+        render rather than thirty.
+
+  DETAIL WORTH KNOWING:
+        - Natural ordering: "Font2" sorts before "Font10". Plain string order
+          puts "Font10" first, and numbered weights are common enough that the
+          wrong order is noticeable immediately.
+        - Companions (.afm, .pfm, .inf) are hidden from the list and attached to
+          their Type 1 font instead, ready for favourites in Phase 5.
+        - Collections cannot be expanded at scan time: how many faces a file
+          holds is not knowable until it has been opened. The rows appear with
+          the metadata.
+        - A font that will not open still gets a row, marked with a warning and
+          carrying its error in the tooltip, and selecting it clears the preview
+          rather than failing (requirement R10).
+        - Waterfall lines are clipped at the panel edge rather than wrapped, so
+          the ladder of sizes stays comparable; the main preview wraps to the
+          panel.
+        - Ctrl+Down and Ctrl+Up are window-level bindings, so they work from
+          inside the preview text box, and the list scrolls to follow.
+        - Navigation stops at the ends rather than wrapping: a held-down
+          Ctrl+Down that cycled for ever would never show it had finished.
+
+  BUG FOUND AND FIXED DURING THE PHASE: a font is not known to be broken until
+        it has been opened, which happens in the background pass — by which time
+        the preview may already be pointed at it. Selecting the row again
+        changed nothing, because the selection had not changed. The preview is
+        now re-synchronised when metadata arrives for the row already on screen.
+
+  KEYS SO FAR: Ctrl+O, Ctrl+Shift+O, Ctrl+Down, Ctrl+Up, Ctrl+Home, Ctrl+End,
+        F5, Ctrl+= and Ctrl+- for size, and Ctrl with the mouse wheel over the
+        preview. The rest of Section 9 arrives with the features they belong to.
+
+  VERIFIED: 149 tests, all passing, zero build warnings.
+        - Opening Inter-Bold.ttf lists all 40 fonts in the folder with that one
+          selected, and the status bar reads "Font 6 of 40".
+        - The scanner finds every format in the corpus, hides companions while
+          attaching them, sorts naturally, honours the subfolder switch, and
+          returns nothing rather than throwing for a folder that is not there.
+        - The metadata pass replaces file names with family names; a collection
+          becomes two rows labelled (1/2) and (2/2); a corrupt file becomes one
+          marked row and leaves its neighbour alone.
+        - Next and previous walk all five fonts of a folder and back, and stop
+          at both ends.
+        - Rescan picks up a font added after the folder was opened and keeps the
+          selection.
+        - A bitmap font reports the sizes it actually has.
+        - The published exe is still one file, 60.28 MB, and writes nothing
+          beside itself.
+
+  NOT YET DONE: the search box, the subfolder toggle, sort options and recent
+        folders are Phase 7; the star column and the Favourites button are Phase
+        5; the All Fonts, Glyphs and Info tabs are Phases 4 and 6. The tab strip
+        currently holds Preview alone.
 
 Phase 2: WOFF and WOFF 2.0
   WHAT: Managed decoders for both web font formats. New in Engine/Woff/:
