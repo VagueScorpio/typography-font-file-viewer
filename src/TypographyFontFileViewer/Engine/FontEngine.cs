@@ -50,13 +50,33 @@ internal sealed unsafe class FontEngineContext
         LoadedFace? cached = Cache.TryGet(key);
         if (cached is not null) return cached;
 
-        byte[] bytes = LoadedFace.ReadWithoutLocking(key.Path);
-        FontFormat format = SniffFormat(key.Path, bytes);
-
-        return LoadFace(key, bytes, format);
+        (byte[] sfnt, FontFormat format) = ReadAndNormalize(key.Path);
+        return LoadFace(key, sfnt, format);
     }
 
-    /// <summary>Opens a face from bytes already in hand, adding it to the cache.</summary>
+    /// <summary>
+    /// Reads a font file and returns SFNT bytes plus the container it arrived in.
+    /// </summary>
+    /// <remarks>
+    /// A WOFF or WOFF2 file is decoded here, so everything downstream sees plain SFNT.
+    /// The container format is still reported, because that is what the list badge and
+    /// the Info tab show.
+    /// </remarks>
+    public static (byte[] Sfnt, FontFormat Container) ReadAndNormalize(string path)
+    {
+        byte[] raw = LoadedFace.ReadWithoutLocking(path);
+        FontFormat format = SniffFormat(path, raw);
+        return (FormatNormalizer.ToSfnt(raw, format, path), format);
+    }
+
+    /// <summary>
+    /// Opens a face from SFNT bytes already in hand, adding it to the cache.
+    /// </summary>
+    /// <remarks>
+    /// The bytes must already have been through <see cref="FormatNormalizer"/>; a WOFF
+    /// file handed straight to FreeType would either fail or, worse, open with whatever
+    /// partial support the native library happens to have.
+    /// </remarks>
     public LoadedFace LoadFace(FaceKey key, byte[] bytes, FontFormat format)
     {
         LoadedFace? cached = Cache.TryGet(key);

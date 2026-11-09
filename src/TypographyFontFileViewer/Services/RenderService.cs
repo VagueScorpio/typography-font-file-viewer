@@ -49,8 +49,12 @@ public sealed class RenderService : IDisposable
             FontFormat format = FontFormat.Unknown;
             try
             {
-                byte[] bytes = LoadedFace.ReadWithoutLocking(path);
-                format = FontEngineContext.SniffFormat(path, bytes);
+                byte[] raw = LoadedFace.ReadWithoutLocking(path);
+
+                // Sniff before decoding, so a WOFF2 that fails to unpack is still
+                // reported as a WOFF2 rather than as an unknown file.
+                format = FontEngineContext.SniffFormat(path, raw);
+                byte[] bytes = FormatNormalizer.ToSfnt(raw, format, path);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 int faceCount = Math.Max(1, context.ReadFaceCount(bytes));

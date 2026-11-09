@@ -293,12 +293,50 @@ def make_woff_pair(sfnt_path: Path, force: bool) -> list[Path]:
             continue
 
         try:
-            font = TTFont(sfnt_path)
+            # recalcTimestamp and recalcBBoxes would re-stamp head.modified and redo the
+            # bounding boxes on save, leaving the web font subtly different from the
+            # font it came from. The decoder tests compare the two byte for byte, so the
+            # conversion has to be faithful rather than merely equivalent.
+            font = TTFont(sfnt_path, recalcBBoxes=False, recalcTimestamp=False)
             font.flavor = flavor
             font.save(target)
             font.close()
             ratio = target.stat().st_size / sfnt_path.stat().st_size
             log(f"  built    {target.name}  ({target.stat().st_size:,} bytes, {ratio:.0%} of source)")
+            produced.append(target)
+        except Exception as error:
+            log(f"  SKIPPED  {target.name}  ({type(error).__name__}: {error})")
+
+    return produced
+
+
+def make_transform_variants(sfnt_path: Path, force: bool) -> list[Path]:
+    """Write WOFF2 variants that exercise the decoder's other transform paths.
+
+    The default WOFF2 writer transforms glyf and loca only. Two more cases matter and
+    would otherwise never be tested: an hmtx whose left side bearings have been dropped
+    (the decoder has to rebuild them from the glyph bounding boxes), and a file with no
+    transforms at all (every table passed straight through).
+    """
+    from fontTools.ttLib import woff2
+
+    produced: list[Path] = []
+    variants = {
+        "-hmtxtransform.woff2": ("glyf", "loca", "hmtx"),
+        "-notransform.woff2": (),
+    }
+
+    for suffix, transform_tables in variants.items():
+        target = sfnt_path.with_name(sfnt_path.stem + suffix)
+        if target.exists() and not force:
+            log(f"  kept     {target.name}  (already present)")
+            produced.append(target)
+            continue
+
+        try:
+            woff2.compress(str(sfnt_path), str(target), transform_tables=transform_tables)
+            described = ", ".join(transform_tables) if transform_tables else "nothing"
+            log(f"  built    {target.name}  (transforms: {described})")
             produced.append(target)
         except Exception as error:
             log(f"  SKIPPED  {target.name}  ({type(error).__name__}: {error})")
@@ -373,6 +411,18 @@ def main() -> int:
     )
     for sfnt_path in sfnt_files:
         make_woff_pair(sfnt_path, args.force)
+    log("")
+
+    # One font is enough to cover the remaining transform paths; doing it for all of
+    # them would double the corpus for no extra coverage.
+    log("Building WOFF2 transform variants")
+    variant_source = next(
+        (path for path in sfnt_files if path.name == "Inter-Regular.ttf"),
+        sfnt_files[0] if sfnt_files else None)
+    if variant_source is None:
+        log("  (no SFNT font to transform)")
+    else:
+        make_transform_variants(variant_source, args.force)
     log("")
 
     log("Verifying triples (same glyph count and family across .ttf/.otf, .woff, .woff2)")

@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 2: WOFF and WOFF 2.0
     - Phase 1: font engine core
     - Test fonts: fonttools corpus builder
     - Phase 0: scaffold and de-risk
@@ -13,6 +14,80 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 2: WOFF and WOFF 2.0
+  WHAT: Managed decoders for both web font formats. New in Engine/Woff/:
+        ByteReader, SfntWriter, WoffDecoder, Woff2Decoder and
+        Woff2GlyfReconstructor; new Engine/FormatNormalizer.cs dispatches to
+        them. .woff and .woff2 files now open, render, list their glyphs and
+        report their metadata exactly like any other font.
+  WHY:  Phase 1 left WOFF 1.0 working by accident (FreeType has zlib) and
+        WOFF 2.0 not working at all (this prebuilt freetype.dll has no Brotli).
+        Relying on whatever the native library happens to support is precisely
+        what the blueprint warned against, so both formats are now decoded in
+        managed code and FreeType only ever sees plain SFNT.
+  HOW:  WOFF 1.0 is a 44-byte header plus a directory of raw or zlib-deflated
+        tables. WOFF 2.0 is considerably more: tags replaced by indices into a
+        fixed list of 63, lengths in a variable-width integer, every table's
+        data concatenated into one Brotli stream, and the outline tables
+        structurally rewritten. Woff2GlyfReconstructor puts glyf and loca back
+        together from seven parallel streams, decoding point coordinates through
+        the 128-entry triplet code, rebuilding composite glyphs, and recomputing
+        the bounding boxes that were left out. A transformed hmtx has its left
+        side bearings restored from those bounding boxes. SfntWriter reassembles
+        everything, recomputing table checksums and head.checkSumAdjustment.
+
+  BUG FOUND AND FIXED DURING THE PHASE: the bounding-box bitmap in a transformed
+        glyf table is padded to a four-byte boundary, not to a whole byte. The
+        first implementation rounded to a byte, which for Inter (2,933 glyphs)
+        read 367 bytes where the format specifies 368. Everything following was
+        then shifted by one byte, which left simple glyphs correct — their boxes
+        are computed from their own points — and silently displaced every
+        composite glyph instead, so accented capitals drifted while plain Latin
+        looked perfect. Noto Sans and Noto Serif passed throughout, because
+        their glyph counts happen to land where the two calculations agree.
+        Only the pixel-for-pixel comparison against the original font caught it.
+        WoffInternalsTests.CompositeGlyphsFromAWoff2_LandWhereTheOriginalPutsThem
+        now guards it specifically.
+
+  TEST FIXTURES: tools/make-test-fonts.py now also writes
+        Inter-Regular-hmtxtransform.woff2 and Inter-Regular-notransform.woff2,
+        so the hmtx transform and the all-null-transform path are both covered;
+        the default writer only ever transforms glyf and loca. The .woff and
+        .woff2 conversions are now made with recalcBBoxes and recalcTimestamp
+        turned off, so a web font is byte-faithful to the font it came from and
+        the decoders can be checked against it exactly rather than approximately.
+
+  VERIFIED: 116 tests, all passing, zero build warnings.
+        - All 10 X.ttf / X.woff / X.woff2 triples report the same glyph count
+          and family name, and render pixel-for-pixel identically at 32 pt.
+        - Decoding a .woff reproduces every table byte for byte, head aside,
+          where only checkSumAdjustment may differ; decoding a .woff2 reproduces
+          every table except glyf, loca and head, which are legitimately rebuilt.
+        - The hmtx-transformed and no-transform WOFF2 variants both render
+          identically to the original TTF.
+        - CFF-outline, variable and composite-heavy fonts all survive the round
+          trip; variable axes and glyph lists come through unchanged.
+        - Truncated (at 2%, 10%, 50% and 95%), corrupted, zero-table,
+          lying-length and decompression-bomb files all produce an error card,
+          and 40 malformed files in a row leave the engine serving the next
+          request.
+        - A web font is not locked while it is open.
+        - The published exe is still one file, 60.24 MB.
+
+  DEVIATION FROM THE BLUEPRINT: a WOFF 2.0 file may hold a whole TrueType
+        collection. This decoder parses the collection directory, validates its
+        table indices, and then refuses the file with a message naming how many
+        fonts are inside, rather than rebuilding it. Nothing available can
+        produce such a file to test against — fontTools cannot write one — and
+        an unverified reconstruction of a font format is worse than a clear
+        refusal. The parse is still done so a collection can never be mistaken
+        for a single font and silently mis-decoded.
+
+  ALSO: InternalsVisibleTo was added for the test project. The decoders are
+        internal, but they are exactly the kind of code that deserves direct
+        unit tests of its own — variable-length integers, checksum arithmetic,
+        table layout — rather than only being exercised through a rendered page.
 
 Phase 1: font engine core
   WHAT: The real engine, replacing the Phase 0 spike. New in Core/: FontFormat,

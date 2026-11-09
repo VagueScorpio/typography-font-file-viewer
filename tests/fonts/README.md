@@ -24,6 +24,7 @@ collection from the variable ones, and converts every SFNT font into matching
 | OpenType, CFF outlines | `SourceSerif4-Regular.otf` | the non-TrueType outline format |
 | Collection | `TestCollection.ttc` | one list entry per face, the TTC favourites rule |
 | WOFF 1.0 / 2.0 | one pair per SFNT font | the managed decoders, against their own original |
+| WOFF2 transforms | `Inter-Regular-hmtxtransform.woff2`, `Inter-Regular-notransform.woff2` | the hmtx transform, and the all-null-transform path |
 | PostScript Type 1 | `NimbusRoman-Regular.pfa` | the FreeType fallback shaping path |
 | X11 bitmap | `spleen-8x16.bdf`, `spleen-8x16.pcf`, `spleen-12x24.pcf` | fixed strikes, `FT_Select_Size` |
 | Windows bitmap | `spleen-8x16.fon`, `spleen-12x24.fon` | `FT_Get_WinFNT_Header` |

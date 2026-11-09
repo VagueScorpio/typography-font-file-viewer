@@ -14,10 +14,6 @@ public class FontEngineTests
     /// <summary>The runner's token, so a wedged test can actually be cancelled.</summary>
     private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
-    /// <summary>Formats whose decoders arrive in Phase 2; checked separately.</summary>
-    private static bool IsWebFont(string path)
-        => Path.GetExtension(path).ToLowerInvariant() is ".woff" or ".woff2";
-
     private const string SampleText = "Hamburgefonstiv 123";
 
     private static int CountInkPixels(byte[] bgra)
@@ -33,7 +29,7 @@ public class FontEngineTests
     [Fact]
     public async Task EveryCorpusFont_Opens()
     {
-        IReadOnlyList<string> fonts = TestFonts.All().Where(path => !IsWebFont(path)).ToList();
+        IReadOnlyList<string> fonts = TestFonts.All();
         if (fonts.Count == 0) TestFonts.RequireCorpus();
 
         using var service = new RenderService();
@@ -60,7 +56,7 @@ public class FontEngineTests
     [Fact]
     public async Task EveryCorpusFont_ReportsAFamilyName()
     {
-        IReadOnlyList<string> fonts = TestFonts.All().Where(path => !IsWebFont(path)).ToList();
+        IReadOnlyList<string> fonts = TestFonts.All();
         if (fonts.Count == 0) TestFonts.RequireCorpus();
 
         using var service = new RenderService();
@@ -81,7 +77,7 @@ public class FontEngineTests
     [Fact]
     public async Task EveryCorpusFont_RendersInk()
     {
-        IReadOnlyList<string> fonts = TestFonts.All().Where(path => !IsWebFont(path)).ToList();
+        IReadOnlyList<string> fonts = TestFonts.All();
         if (fonts.Count == 0) TestFonts.RequireCorpus();
 
         using var service = new RenderService();
@@ -351,42 +347,7 @@ public class FontEngineTests
             Assert.True(glyphs[i].Codepoint > glyphs[i - 1].Codepoint);
     }
 
-    // --- Web fonts: Phase 2 owns these -----------------------------------------
-
-    /// <summary>
-    /// Records exactly where WOFF support stands before Phase 2 writes the decoders.
-    /// </summary>
-    /// <remarks>
-    /// The prebuilt freetype.dll handles WOFF 1.0, because that is zlib and FreeType
-    /// always has zlib. It cannot handle WOFF 2.0, because that is Brotli and this build
-    /// was compiled without it — which is precisely why the blueprint calls for managed
-    /// decoders rather than relying on whatever the native library happens to support.
-    /// When Phase 2 lands, both halves of this test become "opens".
-    /// </remarks>
-    [Fact]
-    public async Task Woff1OpensThroughFreeType_Woff2DoesNotUntilPhase2()
-    {
-        IReadOnlyList<string> woff = TestFonts.WithExtension(".woff");
-        IReadOnlyList<string> woff2 = TestFonts.WithExtension(".woff2");
-        if (woff.Count == 0 && woff2.Count == 0) Assert.Skip("No web fonts in the corpus.");
-
-        using var service = new RenderService();
-
-        foreach (string path in woff)
-        {
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
-            Assert.False(summaries[0].IsBroken,
-                $"{Path.GetFileName(path)} should open: {summaries[0].Error}");
-            Assert.Equal(FontFormat.Woff, summaries[0].Format);
-        }
-
-        foreach (string path in woff2)
-        {
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
-            Assert.True(summaries[0].IsBroken,
-                $"{Path.GetFileName(path)} opened unexpectedly — if the native library "
-                + "gained Brotli, this test and the Phase 2 plan both need revisiting.");
-            Assert.Equal(FontFormat.Woff2, summaries[0].Format);
-        }
-    }
+    // Web fonts are no longer a special case: the corpus-wide tests above cover
+    // .woff and .woff2 alongside everything else. WoffDecoderTests checks that the
+    // decoders reproduce the original font exactly.
 }

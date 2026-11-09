@@ -38,6 +38,12 @@
   </Target>
 
   <ItemGroup>
+    <!-- The WOFF decoders are internal, but they are exactly the kind of thing that
+         deserves direct unit tests rather than only being exercised through the UI. -->
+    <InternalsVisibleTo Include="TypographyFontFileViewer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- MIT. Ships runtimes/win-x64/native/freetype.dll. -->
     <PackageReference Include="FreeTypeSharp" Version="3.1.0" />
     <!-- MIT. The managed binding; the native library comes from the NativeAssets package. -->
