@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Typography Font File Viewer 1.0"
-        Height="460" Width="860"
-        MinHeight="320" MinWidth="520"
+        Height="560" Width="900"
+        MinHeight="360" MinWidth="560"
         Background="White"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
@@ -17,13 +17,13 @@
                 BorderThickness="0,0,0,1"
                 Padding="16,12">
             <StackPanel>
-                <TextBlock Text="Phase 0 — scaffold and de-risk"
+                <TextBlock Text="Phase 1 — font engine core"
                            FontSize="15" FontWeight="SemiBold" />
                 <TextBlock x:Name="SubtitleText"
                            Margin="0,3,0,0"
                            Foreground="{StaticResource MutedText}"
                            TextWrapping="Wrap"
-                           Text="Rendering through FreeType and HarfBuzz…" />
+                           Text="Starting the engine…" />
             </StackPanel>
         </Border>
 
@@ -38,17 +38,25 @@
                        Text="Starting…" />
         </Border>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
-                      Padding="16">
+                      Padding="16"
+                      SizeChanged="OnViewportSizeChanged">
             <StackPanel>
-                <!-- The whole point of the phase: these pixels come from FreeType,
-                     positioned by HarfBuzz, with nothing installed on the machine. -->
-                <Image x:Name="SpikeImage"
+                <!-- Shaped by HarfBuzz, rasterized by FreeType, wrapped to this panel,
+                     handed to WPF as a frozen bitmap of plain bytes. -->
+                <Image x:Name="PreviewImage"
                        HorizontalAlignment="Left"
                        Stretch="None"
                        SnapsToDevicePixels="True"
                        RenderOptions.BitmapScalingMode="NearestNeighbor" />
+
+                <TextBlock x:Name="DetailsText"
+                           Margin="0,16,0,0"
+                           Foreground="{StaticResource MutedText}"
+                           TextWrapping="Wrap"
+                           FontFamily="Consolas, Courier New"
+                           LineHeight="18" />
 
                 <TextBlock x:Name="ErrorText"
                            Visibility="Collapsed"

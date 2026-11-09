@@ -1,78 +1,186 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using TypographyFontFileViewer.Core;
-using TypographyFontFileViewer.Engine;
+using TypographyFontFileViewer.Services;
 
 namespace TypographyFontFileViewer;
 
 public partial class MainWindow : Window
 {
-    private const string SpikeText = "Hello";
-    private const double SpikePointSize = 72;
+    private const string SampleText =
+        "The quick brown fox jumps over the lazy dog. " +
+        "Pack my box with five dozen liquor jugs.";
+
+    private const double SamplePointSize = 36;
+
+    private readonly RenderService _renderService = new();
+    private CancellationTokenSource? _pendingRender;
+    private bool _loaded;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += OnLoaded;
-        DpiChanged += (_, _) => RunSpike();
+        DpiChanged += (_, _) => _ = ShowFontAsync();
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e) => RunSpike();
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        _loaded = true;
+        await ShowFontAsync();
+    }
+
+    /// <summary>Re-wraps the preview when the window is resized.</summary>
+    private void OnViewportSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_loaded && e.WidthChanged) _ = ShowFontAsync();
+    }
 
     /// <summary>
-    /// Loads a font off disk, shapes a string through HarfBuzz, rasterizes it with
-    /// FreeType and shows the result. If this works from a lone exe on a machine with
-    /// no .NET and no fonts installed, the rest of the app is ordinary work.
+    /// Drives the whole engine once: open a font, read its metadata, lay text out, and
+    /// show the pixels that come back.
     /// </summary>
-    private void RunSpike()
+    private async Task ShowFontAsync()
     {
+        // A new request supersedes whatever was in flight.
+        CancellationTokenSource request = new();
+        CancellationTokenSource? previous = Interlocked.Exchange(ref _pendingRender, request);
+        previous?.Cancel();
+        previous?.Dispose();
+
+        CancellationToken cancellationToken = request.Token;
         var timer = Stopwatch.StartNew();
-        string fontPath = FindSpikeFont();
+        string fontPath = FindSampleFont();
 
         try
         {
-            // Per-Monitor V2 is on, so ask the window where it actually is.
+            await _renderService.Ready;
+
+            FaceSummary[] summaries = await _renderService.ReadSummariesAsync(
+                fontPath, JobPriority.High, cancellationToken);
+
+            FaceSummary summary = summaries[0];
+            if (summary.IsBroken)
+            {
+                ShowFailure(fontPath, summary.Error ?? "Unknown error.");
+                return;
+            }
+
             double dpi = VisualTreeHelper.GetDpi(this).PixelsPerInchX;
-            int pixelSize = (int)Math.Round(SpikePointSize * dpi / 72.0);
+            int wrapWidth = Math.Max(120, (int)((ActualWidth - 80) * dpi / 96.0));
 
-            var summary = FreeTypeSpike.ReadFaceSummary(fontPath);
-            RenderedBitmap rendered = FreeTypeSpike.Render(fontPath, SpikeText, pixelSize);
+            var key = FaceKey.For(fontPath, summary.FaceIndex);
 
-            // The engine hands over plain bytes; the UI thread owns every WPF object.
+            RenderedText rendered = await _renderService.RenderTextAsync(
+                key, SampleText, SamplePointSize, dpi, wrapWidth,
+                RenderStyle.Light, JobPriority.High, cancellationToken);
+
+            FontInfo info = await _renderService.ReadInfoAsync(
+                key, JobPriority.High, cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested) return;
+
+            // The engine hands over bytes; the UI thread owns every WPF object.
             var source = BitmapSource.Create(
-                rendered.Width, rendered.Height,
-                dpi, dpi,
-                PixelFormats.Bgra32, null,
-                rendered.Bgra, rendered.Stride);
+                rendered.Width, rendered.Height, dpi, dpi,
+                PixelFormats.Bgra32, null, rendered.Bgra, rendered.Stride);
             source.Freeze();
 
-            SpikeImage.Source = source;
+            PreviewImage.Source = source;
             ErrorText.Visibility = Visibility.Collapsed;
 
             SubtitleText.Text =
-                $"{summary.Family} {summary.Style} · {summary.GlyphCount:N0} glyphs · " +
-                $"{SpikeText.Length} characters shaped into {rendered.GlyphCount} glyphs by HarfBuzz";
+                $"{summary.DisplayName} · {summary.Format.Badge()} · {summary.GlyphCount:N0} glyphs · " +
+                $"{rendered.GlyphCount} glyphs shaped onto {rendered.LineCount} line" +
+                (rendered.LineCount == 1 ? "" : "s");
 
+            DetailsText.Text = Describe(info, rendered);
+
+            (int count, long bytes, int hits, int misses, _) = _renderService.CacheStatistics;
             StatusText.Text =
-                $"{Path.GetFileName(fontPath)} · {SpikePointSize:0} pt at {dpi:0} DPI = {pixelSize} px · " +
-                $"{rendered.Width}×{rendered.Height} px rendered in {timer.ElapsedMilliseconds} ms · " +
-                $"running from {AppContext.BaseDirectory}";
+                $"{Path.GetFileName(fontPath)} · FreeType {_renderService.NativeVersion} · " +
+                $"{SamplePointSize:0} pt at {dpi:0} DPI = {RenderService.ToPixelSize(SamplePointSize, dpi)} px · " +
+                $"{timer.ElapsedMilliseconds} ms · cache {count} faces, {bytes / 1024 / 1024} MB, " +
+                $"{hits} hits / {misses} misses";
         }
-        catch (Exception ex) when (ex is FontLoadException or IOException)
+        catch (OperationCanceledException)
         {
-            SpikeImage.Source = null;
-            SubtitleText.Text = "The spike could not render.";
-            ErrorText.Text = $"{fontPath}\n\n{ex.GetType().Name}: {ex.Message}";
-            ErrorText.Visibility = Visibility.Visible;
-            StatusText.Text = "Failed — see the message above.";
+            // Superseded by a newer request; the newer one owns the UI now.
+        }
+        catch (Exception exception)
+        {
+            ShowFailure(fontPath, $"{exception.GetType().Name}: {exception.Message}");
         }
     }
 
-    /// <summary>Picks a font that is on every Windows machine, newest install layout first.</summary>
-    private static string FindSpikeFont()
+    private static string Describe(FontInfo info, RenderedText rendered)
+    {
+        var text = new StringBuilder();
+
+        void Line(string label, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                text.AppendLine($"{label,-16}{value}");
+        }
+
+        Line("Outline format", info.OutlineFormat);
+        Line("Full name", info.FullName);
+        Line("Version", info.Version);
+        Line("PostScript", info.PostScriptName);
+        Line("Designer", info.Designer);
+        Line("Manufacturer", info.Manufacturer);
+        Line("Embedding", info.Embedding.ToString());
+        Line("Units per em", info.UnitsPerEm.ToString());
+        Line("Mapped chars", $"{info.MappedCharacterCount:N0} of {info.GlyphCount:N0} glyphs");
+        Line("Charmaps", info.CharmapCount.ToString());
+        Line("Kerning", info.HasKerning ? "yes" : "no");
+        Line("Glyph names", info.HasGlyphNames ? "yes" : "no");
+        Line("Colour", info.HasColor ? "yes" : "no");
+
+        if (info.FixedSizes.Count > 0)
+            Line("Fixed sizes", string.Join(", ", info.FixedSizes));
+
+        if (info.VariationAxes.Count > 0)
+        {
+            Line("Variable", $"{info.VariationAxes.Count} axes, {info.NamedInstances.Count} named instances");
+            foreach (VariationAxis axis in info.VariationAxes)
+                Line("  axis", axis.ToString());
+        }
+
+        Line("Copyright", Shorten(info.Copyright, 120));
+        Line("Licence", Shorten(info.License, 120));
+
+        if (rendered.HasMissingGlyphs)
+            Line("Note", "some characters had no glyph and were drawn as .notdef");
+
+        return text.ToString().TrimEnd();
+    }
+
+    private static string? Shorten(string? value, int limit)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        string collapsed = value.ReplaceLineEndings(" ").Trim();
+        return collapsed.Length <= limit ? collapsed : collapsed[..limit] + "…";
+    }
+
+    private void ShowFailure(string fontPath, string message)
+    {
+        PreviewImage.Source = null;
+        DetailsText.Text = string.Empty;
+        SubtitleText.Text = "The engine could not open this font.";
+        ErrorText.Text = $"{fontPath}\n\n{message}";
+        ErrorText.Visibility = Visibility.Visible;
+        StatusText.Text = "Failed — see the message above.";
+    }
+
+    /// <summary>Picks a font that exists on every Windows machine.</summary>
+    private static string FindSampleFont()
     {
         string fontsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
         foreach (string candidate in new[] { "arial.ttf", "segoeui.ttf", "tahoma.ttf", "verdana.ttf" })
@@ -81,8 +189,15 @@ public partial class MainWindow : Window
             if (File.Exists(path)) return path;
         }
 
-        // Nothing standard found: name the first file we can see so the error is useful.
         string? any = Directory.EnumerateFiles(fontsFolder, "*.ttf").FirstOrDefault();
         return any ?? Path.Combine(fontsFolder, "arial.ttf");
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _pendingRender?.Cancel();
+        _pendingRender?.Dispose();
+        _renderService.Dispose();
+        base.OnClosed(e);
     }
 }

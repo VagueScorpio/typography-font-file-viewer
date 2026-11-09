@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 1: font engine core
     - Test fonts: fonttools corpus builder
     - Phase 0: scaffold and de-risk
     - Naming: Typography Font File Viewer
@@ -12,6 +13,99 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 1: font engine core
+  WHAT: The real engine, replacing the Phase 0 spike. New in Core/: FontFormat,
+        FormatSniffer, FaceKey, FaceSummary, FontInfo and the render types. New
+        in Engine/: FontEngine (the dedicated thread), EngineJob, FaceCache,
+        LoadedFace, TextLayout, GlyphRasterizer, MetadataReader and
+        FreeTypeNative. New in Services/: RenderService, the public async API.
+        Engine/FreeTypeSpike.cs and its tests are gone.
+  WHY:  Everything above this layer — folder browsing, the gallery, favourites,
+        the glyph map, the Info tab — is a client of these five calls. Getting
+        the threading, the cancellation and the no-lock rule right once here is
+        what keeps the rest of the phases ordinary UI work.
+  HOW:  One background thread named FontEngine owns the FT_Library and every
+        face. Work reaches it through two queues, High and Low, drained strictly
+        High-first, so a thousand queued gallery rows cannot delay the selected
+        font's preview. Every job carries a CancellationToken, checked when it
+        reaches the front of the queue and again inside the job. Faces are read
+        whole into pinned memory over a FileShare.ReadWrite|Delete handle and
+        opened with FT_New_Memory_Face, so no font file is ever locked. A
+        least-recently-used FaceCache holds 64 faces or 256 MB, whichever comes
+        first. RenderService hands the UI nothing but plain data.
+
+  DETAIL WORTH KNOWING:
+        - FormatSniffer reads magic bytes first and the extension only as a
+          fallback, so a CFF font named .ttf opens as what it is. MZ counts as a
+          font only when the name agrees, because every Windows executable
+          starts that way.
+        - TextLayout has two paths: HarfBuzz for SFNT fonts, and FreeType's own
+          cmap plus kern table for Type 1, BDF, PCF and Windows FNT, which
+          HarfBuzz cannot take. Both feed one shared line-breaker, which wraps on
+          spaces and falls back to breaking inside a word too long for the panel
+          rather than dropping it.
+        - GlyphRasterizer handles every pixel mode FreeType emits: 8-bit
+          coverage, 1-bit from bitmap fonts, the 2- and 4-bit forms (normalised
+          through FT_Bitmap_Convert rather than unpacked by hand), and
+          premultiplied BGRA from colour fonts.
+        - Bitmap fonts snap to their nearest available strike via FT_Select_Size
+          instead of failing at a size they do not have.
+        - Type 1 fonts get their .afm/.pfm metrics attached from memory with
+          FT_Attach_Stream, which keeps the no-lock rule and sidesteps FreeType's
+          byte-oriented path handling for non-ASCII names.
+        - MetadataReader scores name records rather than taking the first:
+          Windows/English wins, then Unicode, then Mac Roman. Type 1, WinFNT and
+          BDF/PCF metadata come from their own accessors.
+
+  ADDED BINDINGS: FreeTypeSharp 3.1.0 does not bind the metadata accessors, so
+        Engine/FreeTypeNative.cs declares FT_Get_Sfnt_Name(_Count),
+        FT_Get_PS_Font_Info, FT_Get_WinFNT_Header, FT_Get_BDF_Property,
+        FT_Get_Font_Format, FT_Get_MM_Var and FT_Done_MM_Var against the same
+        freetype.dll the package already ships, where all of them are exported.
+        Before relying on this, the FT_FaceRec_ layout was checked against a
+        known font: this build uses a 64-bit FT_Long, matching the binding's
+        structs, so units_per_EM, num_glyphs and the name pointers all read
+        correctly. Where FreeType writes into a caller-supplied record
+        (FT_WinFNT_HeaderRec, BDF_PropertyRec), an oversized zeroed buffer is
+        passed and fields are read at fixed offsets, so a future FreeType that
+        grew one of those records could not overwrite the stack.
+
+  VERIFIED: 76 tests, all passing, zero build warnings.
+        - Every one of the 17 non-web corpus fonts opens, reports a family name,
+          and renders visible ink: variable and static TTF, CFF-outline OTF, TTC,
+          Type 1, BDF, PCF and Windows FON.
+        - TestCollection.ttc reports both faces separately, and the two render
+          differently. cambria.ttc enumerates its faces.
+        - Inter's variable axes come back as wght and opsz with sane
+          minimum/default/maximum ordering, plus named instances.
+        - Bitmap fonts report their fixed sizes, are marked not scalable, and
+          render after snapping from a size they do not have (41 px).
+        - Segoe UI Emoji renders in actual colour through the BGRA path.
+        - Microsoft YaHei lists over 10,000 glyphs in ascending code-point order.
+        - A font deleted while it is on screen stays deleted, and the cached face
+          keeps rendering from memory; a font can be overwritten in place.
+        - Garbage, zero-byte, truncated and missing files produce an error row
+          rather than an exception, and the engine thread survives to serve the
+          next request.
+        - 60 overlapping requests across both priorities all settle; a cancelled
+          request throws rather than completing; a one-face cache evicts.
+        - The published exe is still one file, 60.23 MB, and from an empty folder
+          renders a wrapped pangram with full metadata in 70 ms.
+
+  KNOWN STATE: WOFF 1.0 files open, because FreeType always has zlib. WOFF 2.0
+        files do not, because this prebuilt freetype.dll has no Brotli — exactly
+        the reason the blueprint asks for managed decoders instead of trusting
+        the native library. A test pins both halves of that down, and Phase 2
+        turns it into "both open".
+
+  DEVIATIONS FROM THE BLUEPRINT, and why:
+        - RenderGlyphCellsAsync takes GlyphEntry values rather than bare code
+          points. The Glyphs tab has to be able to show glyphs no code point
+          reaches (section 8.5, "Show unmapped glyphs"), and a code point cannot
+          name one.
+        - Core/FontFile.cs is not here. Nothing in the engine uses it; it arrives
+          with FolderScanner in Phase 3 rather than sitting unused.
 
 Test fonts: fonttools corpus builder
   WHAT: Added tools/ with requirements.txt (fonttools[woff] 4.68.0, pinned),

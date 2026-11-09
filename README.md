@@ -4,9 +4,10 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 0 complete.** The solution builds, the tests pass, and the published
-> exe renders text through FreeType and HarfBuzz from a folder containing nothing but
-> itself. The font engine, folder browsing and the four tabs are still to come — see
+> **Status: Phase 1 complete.** The font engine works: it opens TTF, OTF, TTC, Type 1,
+> BDF, PCF and FON fonts, shapes and wraps text, rasterizes colour and bitmap glyphs,
+> and reads full metadata — all without locking a single file. Folder browsing and the
+> four tabs are still to come, and WOFF/WOFF2 decoding lands in Phase 2. See
 > [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ---
@@ -185,8 +186,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Scaffold and de-risk: solution, csproj, manifest, NuGet, FreeType + HarfBuzz spike, single-file publish | **Done** |
-| 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | Next |
-| 2 | WOFF and WOFF2 managed decoders | Not started |
+| 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | **Done** |
+| 2 | WOFF and WOFF2 managed decoders | Next |
 | 3 | Folder browsing and Preview tab | Not started |
 | 4 | All Fonts gallery (virtualized, 1,000+ fonts) | Not started |
 | 5 | Favorites (copy, Recycle Bin, hash matching) | Not started |
