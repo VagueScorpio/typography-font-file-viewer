@@ -202,7 +202,9 @@ internal static unsafe class TextLayout
             int cluster = i;
             if (char.IsHighSurrogate(text[i])) i++;
 
-            uint glyphIndex = FT_Get_Char_Index(ftFace, (nuint)codepoint);
+            // Not a plain Unicode lookup: Windows FNT and friends index by byte value,
+            // and symbol fonts hide their glyphs in the private use area.
+            uint glyphIndex = face.GetGlyphIndex(codepoint);
             bool missing = glyphIndex == 0;
 
             int advance26 = 0;

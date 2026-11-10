@@ -129,9 +129,12 @@ public partial class MainWindow : Window
 
     // --- Menu ------------------------------------------------------------------
 
-    private void OnBiggerClick(object sender, RoutedEventArgs e) => _model.Preview.AdjustSize(2);
+    private void OnBiggerClick(object sender, RoutedEventArgs e) => _model.AdjustSize(2);
 
-    private void OnSmallerClick(object sender, RoutedEventArgs e) => _model.Preview.AdjustSize(-2);
+    private void OnSmallerClick(object sender, RoutedEventArgs e) => _model.AdjustSize(-2);
+
+    /// <summary>Double-clicking a gallery row takes you to the Preview tab.</summary>
+    private void OnGalleryRowActivated(object? sender, EventArgs e) => _model.SelectedTabIndex = 0;
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
 

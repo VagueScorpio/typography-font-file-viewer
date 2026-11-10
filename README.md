@@ -4,10 +4,10 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 3 complete — the app runs.** Open a font and the whole folder loads
-> beside it; scroll or press `Ctrl+Down` to walk through every font, with custom preview
-> text, a size slider and a waterfall. Every format v1.0 promises opens except `.dfont`.
-> Still to come: the All Fonts gallery, favourites, the glyph map and the Info tab. See
+> **Status: Phase 4 complete.** Open a font and the whole folder loads beside it; walk
+> through it with `Ctrl+Down`, or switch to **All Fonts** to see every font in the folder
+> drawn in its own face — tested at 1,361 rows. Every format v1.0 promises opens except
+> `.dfont`. Still to come: favourites, the glyph map and the Info tab. See
 > [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ---
@@ -189,8 +189,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 1 | Font engine core: sniffer, engine thread, FaceCache, TextLayout, rasterizer, metadata | **Done** |
 | 2 | WOFF and WOFF2 managed decoders | **Done** |
 | 3 | Folder browsing and Preview tab | **Done** |
-| 4 | All Fonts gallery (virtualized, 1,000+ fonts) | Next |
-| 5 | Favorites (copy, Recycle Bin, hash matching) | Not started |
+| 4 | All Fonts gallery (virtualized, 1,000+ fonts) | **Done** |
+| 5 | Favorites (copy, Recycle Bin, hash matching) | Next |
 | 6 | Glyphs and Info tabs | Not started |
 | 7 | Search, subfolders, settings persistence, polish | Not started |
 | 8 | Hardening against the stress list | Not started |

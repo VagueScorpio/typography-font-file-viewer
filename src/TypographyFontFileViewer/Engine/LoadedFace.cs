@@ -78,6 +78,24 @@ internal sealed unsafe class LoadedFace : IDisposable
     /// <summary>Which companion metric files were attached, for the Info tab.</summary>
     public IReadOnlyList<string> AttachedCompanions { get; private set; } = [];
 
+    /// <summary>How this face's selected character map wants to be asked for glyphs.</summary>
+    internal enum CharmapKind
+    {
+        /// <summary>No character map at all; only glyph indices work.</summary>
+        None,
+
+        /// <summary>Ordinary Unicode lookup.</summary>
+        Unicode,
+
+        /// <summary>A symbol font, whose glyphs live in the private use area at 0xF000.</summary>
+        Symbol,
+
+        /// <summary>Codes are raw byte values, as Windows FNT and some bitmap fonts use.</summary>
+        Raw,
+    }
+
+    internal CharmapKind Charmap { get; private set; } = CharmapKind.None;
+
     /// <summary>Approximate memory this face accounts for, against the cache budget.</summary>
     public long ByteCost => Bytes.LongLength + NativeOverheadEstimate;
 
@@ -119,6 +137,7 @@ internal sealed unsafe class LoadedFace : IDisposable
 
             loaded._face = face;
             loaded.ReadFaceFlags();
+            loaded.SelectBestCharmap();
 
             if (companionPaths is { Count: > 0 })
                 loaded.AttachCompanions(companionPaths);
@@ -245,6 +264,78 @@ internal sealed unsafe class LoadedFace : IDisposable
                 sizes[i] = ppem > 0 ? ppem : strike.height;
             }
             FixedSizes = sizes;
+        }
+    }
+
+    /// <summary>
+    /// Chooses which character map to look glyphs up through, and how to ask it.
+    /// </summary>
+    /// <remarks>
+    /// FreeType picks a Unicode map by default where one exists, and leaves the face
+    /// with no map at all where none does. Windows FNT fonts are the awkward case: they
+    /// carry a map that indexes by raw byte value, so asking it for Unicode code points
+    /// returns glyph 0 for everything and the text comes out as a row of identical
+    /// .notdef boxes — which looks like a rendered font rather than a failure, and so
+    /// passes any test that only checks that something was drawn.
+    /// </remarks>
+    private void SelectBestCharmap()
+    {
+        int count = _face->num_charmaps;
+        if (count <= 0 || _face->charmaps == null)
+        {
+            Charmap = CharmapKind.None;
+            return;
+        }
+
+        if (FT_Select_Charmap(_face, FT_Encoding_.FT_ENCODING_UNICODE) == FT_Error.FT_Err_Ok)
+        {
+            Charmap = CharmapKind.Unicode;
+            return;
+        }
+
+        if (FT_Select_Charmap(_face, FT_Encoding_.FT_ENCODING_MS_SYMBOL) == FT_Error.FT_Err_Ok)
+        {
+            Charmap = CharmapKind.Symbol;
+            return;
+        }
+
+        // Whatever the font does have: for FNT, BDF and PCF this indexes by byte value.
+        if (FT_Set_Charmap(_face, _face->charmaps[0]) == FT_Error.FT_Err_Ok)
+        {
+            Charmap = _face->charmap != null && _face->charmap->encoding == FT_Encoding_.FT_ENCODING_UNICODE
+                ? CharmapKind.Unicode
+                : CharmapKind.Raw;
+            return;
+        }
+
+        Charmap = CharmapKind.None;
+    }
+
+    /// <summary>
+    /// Finds the glyph for a character, allowing for maps that are not Unicode.
+    /// </summary>
+    /// <returns>The glyph index, or 0 when the font has nothing for this character.</returns>
+    public uint GetGlyphIndex(int codepoint)
+    {
+        if (codepoint < 0 || Charmap == CharmapKind.None) return 0;
+
+        switch (Charmap)
+        {
+            case CharmapKind.Symbol:
+                // Symbol fonts put their glyphs in the private use area.
+                if (codepoint < 0x100)
+                {
+                    uint symbol = FT_Get_Char_Index(_face, (nuint)(0xF000 + codepoint));
+                    if (symbol != 0) return symbol;
+                }
+                return FT_Get_Char_Index(_face, (nuint)codepoint);
+
+            case CharmapKind.Raw:
+                // Byte-indexed: anything past Latin-1 simply is not in the font.
+                return codepoint < 0x100 ? FT_Get_Char_Index(_face, (nuint)codepoint) : 0;
+
+            default:
+                return FT_Get_Char_Index(_face, (nuint)codepoint);
         }
     }
 

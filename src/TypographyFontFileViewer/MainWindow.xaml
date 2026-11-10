@@ -27,6 +27,8 @@
         <KeyBinding Key="Home" Modifiers="Control" Command="{Binding FirstFontCommand}" />
         <KeyBinding Key="End" Modifiers="Control" Command="{Binding LastFontCommand}" />
         <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
+        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ShowTabCommand}" CommandParameter="0" />
+        <KeyBinding Key="D2" Modifiers="Control" Command="{Binding ShowTabCommand}" CommandParameter="1" />
     </Window.InputBindings>
 
     <DockPanel>
@@ -126,9 +128,13 @@
                                TextTrimming="CharacterEllipsis" />
                 </Border>
 
-                <TabControl x:Name="Tabs" BorderThickness="0" Padding="0">
+                <TabControl x:Name="Tabs" BorderThickness="0" Padding="0"
+                            SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
                     <TabItem Header="Preview">
                         <views:PreviewView DataContext="{Binding Preview}" />
+                    </TabItem>
+                    <TabItem Header="All Fonts">
+                        <views:GalleryView x:Name="Gallery" RowActivated="OnGalleryRowActivated" />
                     </TabItem>
                 </TabControl>
             </DockPanel>

@@ -28,11 +28,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _renderService = renderService;
         Preview = new PreviewViewModel(renderService);
+        Gallery = new GalleryViewModel(renderService, Preview);
     }
 
     public PreviewViewModel Preview { get; }
 
-    public ObservableCollection<FontItemViewModel> Fonts { get; } = [];
+    public GalleryViewModel Gallery { get; }
+
+    public ObservableRangeCollection<FontItemViewModel> Fonts { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
@@ -53,6 +56,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial string? Message { get; set; }
+
+    /// <summary>Which tab is showing: 0 is Preview, 1 is All Fonts.</summary>
+    [ObservableProperty]
+    public partial int SelectedTabIndex { get; set; }
+
+    [RelayCommand]
+    private void ShowTab(string? index)
+    {
+        if (int.TryParse(index, out int value)) SelectedTabIndex = value;
+    }
+
+    /// <summary>
+    /// Resizes whichever tab is in front, so Ctrl+= means the same thing everywhere.
+    /// </summary>
+    public void AdjustSize(double delta)
+    {
+        if (SelectedTabIndex == 1) Gallery.AdjustSize(delta);
+        else Preview.AdjustSize(delta);
+    }
 
     /// <summary>The line under the folder path: how many fonts, and how many are broken.</summary>
     public string FolderSummary
@@ -164,9 +186,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         string? selected = SelectedFont?.File.Path;
 
-        // Anything cached for this folder may be stale, so drop it before reloading.
+        // Anything cached for this folder may be stale, so drop it before reloading —
+        // both the open faces and the gallery's rendered rows.
         foreach (string path in Fonts.Select(font => font.File.Path).Distinct().ToList())
+        {
             await _renderService.InvalidateAsync(path, cancellationToken);
+            Gallery.Cache.InvalidatePath(path);
+        }
 
         await LoadFolderAsync(CurrentFolder, selected, cancellationToken);
     }
@@ -185,11 +211,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IReadOnlyList<FontFile> files = await _scanner.ScanAsync(
                 folder, includeSubfolders: false, cancellationToken);
 
-            Fonts.Clear();
             BrokenCount = 0;
 
-            foreach (FontFile file in files)
-                Fonts.Add(new FontItemViewModel(file));
+            // One notification, not one per font: a thousand incremental adds would be
+            // a thousand layout passes in every list bound to this collection.
+            Fonts.ReplaceAll(files.Select(file => new FontItemViewModel(file)));
 
             CurrentFolder = folder;
 
@@ -401,6 +427,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _disposed = true;
 
         CancelMetadataScan();
+        Gallery.Dispose();
         Preview.Dispose();
     }
 }

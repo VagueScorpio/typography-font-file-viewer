@@ -284,6 +284,67 @@ public class FontEngineTests
             $"{Path.GetFileName(path)} rendered no ink at a size it had to snap.");
     }
 
+    /// <summary>
+    /// A bitmap font must render the characters it was given, not a row of .notdef boxes.
+    /// </summary>
+    /// <remarks>
+    /// Windows FNT fonts index their glyphs by raw byte value rather than by Unicode, so
+    /// asking for code points returns glyph 0 every time. The result still has plenty of
+    /// ink — .notdef is usually a filled box — so a test that only counts dark pixels
+    /// passes while the text is unreadable. Rendering two different strings and
+    /// demanding different pixels is what actually catches it.
+    /// </remarks>
+    [Theory]
+    [InlineData(".bdf")]
+    [InlineData(".pcf")]
+    [InlineData(".fon")]
+    public async Task BitmapFonts_RenderTheActualCharacters(string extension)
+    {
+        IReadOnlyList<string> fonts = TestFonts.WithExtension(extension);
+        if (fonts.Count == 0) Assert.Skip($"No {extension} font in the corpus.");
+
+        using var service = new RenderService();
+        var key = FaceKey.For(fonts[0], 0);
+
+        RenderedText first = await service.RenderTextAsync(
+            key, "AAAA", 12, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+        RenderedText second = await service.RenderTextAsync(
+            key, "WWWW", 12, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+
+        Assert.True(CountInkPixels(first.Bgra) > 4, "nothing was drawn at all");
+        Assert.False(
+            first.Width == second.Width && first.Bgra.AsSpan().SequenceEqual(second.Bgra),
+            $"{Path.GetFileName(fonts[0])} drew 'AAAA' and 'WWWW' identically, which means "
+            + "it is drawing .notdef rather than the characters asked for.");
+    }
+
+    [Fact]
+    public async Task AWindowsFntFont_MapsItsCharactersByByteValue()
+    {
+        IReadOnlyList<string> fonts = TestFonts.WithExtension(".fon");
+        if (fonts.Count == 0) Assert.Skip("No .fon font in the corpus.");
+
+        using var service = new RenderService();
+        var key = FaceKey.For(fonts[0], 0);
+
+        // Every one of these is a distinct glyph in any reasonable text font.
+        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(
+            key, cancellationToken: TestCancellation);
+
+        Assert.NotEmpty(glyphs);
+
+        var distinct = new HashSet<uint>();
+        foreach (char character in "ABCWXYZ")
+        {
+            GlyphEntry? entry = glyphs.FirstOrDefault(g => g.Codepoint == character);
+            Assert.True(entry is not null, $"the font maps nothing for '{character}'");
+            distinct.Add(entry!.Value.GlyphIndex);
+        }
+
+        Assert.True(distinct.Count >= 6,
+            $"Expected distinct glyphs per letter, got {distinct.Count} for seven letters.");
+    }
+
     [Fact]
     public async Task BitmapFont_ReportsTheSizesItHas()
     {

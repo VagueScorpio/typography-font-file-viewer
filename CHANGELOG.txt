@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 4: the All Fonts gallery
     - Phase 3: folder browsing and the Preview tab
     - Phase 2: WOFF and WOFF 2.0
     - Phase 1: font engine core
@@ -15,6 +16,66 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 4: the All Fonts gallery
+  WHAT: The second tab: every font in the folder, each drawn in its own face.
+        New Services/RenderedBitmapCache.cs, ViewModels/GalleryViewModel.cs,
+        Controls/FontRenderImage.cs, Views/GalleryView, and
+        Core/ObservableRangeCollection.cs.
+  WHY:  Requirement R3. Reading a list of family names tells you very little
+        about what a font looks like; seeing forty of them at once tells you
+        immediately which three are worth a closer look.
+  HOW:  The gallery binds to the same collection the sidebar does, so selection
+        and the metadata pass are shared rather than duplicated. Rows do not
+        render from the view model: each visible row's FontRenderImage asks for
+        its own bitmap when it is handed a font and cancels that request the
+        moment it is handed a different one, which is what keeps a fast scroll
+        through two thousand fonts to a couple of dozen live requests instead of
+        two thousand. Results are checked against the font the control is
+        showing now before they are painted, because a recycled container can
+        receive a result meant for the font it used to show. Finished bitmaps go
+        into an LRU bounded by both a row count (300) and a byte budget (96 MB).
+
+  TWO BUGS FOUND BY ACTUALLY RUNNING IT:
+        - A folder of 1,322 fonts sat on "Scanning…" for over six seconds. The
+          scanner was not at fault; filling an ObservableCollection one font at a
+          time was, because every add is a change notification and every
+          notification is a layout pass in each bound list. ObservableRangeCollection
+          replaces the contents in one reset instead, and the same folder now
+          lists in well under a second.
+        - Windows FNT (.fon) fonts rendered as a row of identical boxes. They
+          index their glyphs by raw byte value rather than by Unicode, so asking
+          for code points returned glyph 0 for every character and the result was
+          .notdef repeated. LoadedFace now chooses its character map
+          deliberately — Unicode where there is one, the symbol map's private-use
+          area where that is what the font has, raw byte values otherwise — and
+          looks glyphs up accordingly. The Phase 1 test had passed throughout
+          because .notdef is a filled box and the test only counted dark pixels;
+          it now renders two different strings and demands different pixels.
+
+  ALSO: switching to the gallery gives its list the keyboard focus, so Page Down
+        and the arrow keys work without clicking first. Ctrl with the wheel
+        resizes the rows, as in the Preview tab, and Ctrl+1 and Ctrl+2 switch
+        tabs. Double-clicking a row takes you to the Preview tab. A font that
+        will not open shows its error where its preview would be.
+
+  VERIFIED: 169 tests, all passing, zero build warnings.
+        - A folder of 1,322 files (1,361 rows after collections expand, 50 of
+          them deliberately corrupt or zero-byte, 510 MB in all) lists in under
+          a second and reports "1,361 fonts · 50 unreadable".
+        - Scrolling 400 wheel notches deep through the gallery leaves the app
+          responding, with a working set of 325-416 MB against the blueprint's
+          400 MB target, and bitmap, CFF and web fonts all drawing correctly.
+        - A thousand distinct rows rendered in sequence leave the cache at its
+          own limits rather than at the number of fonts.
+        - Forty rows started and abandoned mid-flight leave the gallery working.
+        - The cache keys on everything that changes the pixels, evicts least
+          recently used by both count and bytes, and refuses an unfrozen bitmap.
+
+  NOTE ON MEMORY: the working set sits close to the 400 MB target with a
+        510 MB folder open and the gallery scrolled through it. The face cache
+        (64 faces or 256 MB) is the bulk of that and is already bounded; Phase 8
+        is where the stress list gets run properly and these numbers get tuned.
 
 Phase 3: folder browsing and the Preview tab
   WHAT: The engine became an application. New Core/FontFile.cs (with a natural

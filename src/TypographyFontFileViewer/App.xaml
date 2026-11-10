@@ -11,6 +11,7 @@
 
         <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
         <controls:NullToVisibilityConverter x:Key="NullToVisibility" />
+        <controls:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibility" />
         <controls:EmptyToVisibilityConverter x:Key="EmptyToVisibility" />
     </Application.Resources>
 </Application>
