@@ -26,6 +26,29 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
     public const double MinimumSize = 8;
     public const double MaximumSize = 96;
 
+    /// <summary>
+    /// The four named sizes, as points.
+    /// </summary>
+    /// <remarks>
+    /// These are positions on the same scale the slider moves along rather than a
+    /// separate setting, so picking Large and dragging the slider to 44 do the same
+    /// thing, and a preset lights up whenever the slider lands on it. Small is chosen to
+    /// fit as many fonts on screen as stay legible; Extra Large is for judging a single
+    /// face's detail without leaving the gallery.
+    /// </remarks>
+    public const double SmallSize = 16;
+    public const double MediumSize = 28;
+    public const double LargeSize = 44;
+    public const double ExtraLargeSize = 72;
+
+    public static IReadOnlyList<(string Name, double Size)> SizePresets { get; } =
+    [
+        ("Small", SmallSize),
+        ("Medium", MediumSize),
+        ("Large", LargeSize),
+        ("Extra large", ExtraLargeSize),
+    ];
+
     private readonly RenderService _renderService;
     private readonly PreviewViewModel _preview;
     private bool _disposed;
@@ -53,7 +76,20 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RowHeight))]
-    public partial double GallerySize { get; set; } = 28;
+    [NotifyPropertyChangedFor(nameof(SizeName))]
+    public partial double GallerySize { get; set; } = MediumSize;
+
+    /// <summary>The name of the current size, or the number when it is between presets.</summary>
+    public string SizeName
+    {
+        get
+        {
+            foreach ((string name, double size) in SizePresets)
+                if (Math.Abs(GallerySize - size) < 0.5) return name;
+
+            return $"{GallerySize:0} pt";
+        }
+    }
 
     /// <summary>A uniform row height keeps the virtualized scrollbar honest.</summary>
     public double RowHeight => Math.Ceiling(GallerySize * 1.7) + 18;

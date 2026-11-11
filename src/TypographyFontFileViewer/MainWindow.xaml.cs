@@ -133,8 +133,9 @@ public partial class MainWindow : Window
 
     private void OnSmallerClick(object sender, RoutedEventArgs e) => _model.AdjustSize(-2);
 
-    /// <summary>Double-clicking a gallery row takes you to the Preview tab.</summary>
-    private void OnGalleryRowActivated(object? sender, EventArgs e) => _model.SelectedTabIndex = 0;
+    /// <summary>Double-clicking a gallery row opens that font in the single-font view.</summary>
+    private void OnGalleryRowActivated(object? sender, EventArgs e)
+        => _model.OpenInSingleView(_model.SelectedFont);
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
 

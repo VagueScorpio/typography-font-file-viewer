@@ -4,10 +4,11 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 4 complete.** Open a font and the whole folder loads beside it; walk
-> through it with `Ctrl+Down`, or switch to **All Fonts** to see every font in the folder
-> drawn in its own face — tested at 1,361 rows. Every format v1.0 promises opens except
-> `.dfont`. Still to come: favourites, the glyph map and the Info tab. See
+> **Status: Phase 4 complete.** Open a font and the whole folder loads beside it. A
+> switch in the header moves between **Single font** — one font large, cycled with
+> `Ctrl+Down` — and **Gallery**, every font in the folder drawn in its own face at your
+> choice of four sizes, tested at 1,361 rows. Every format v1.0 promises opens except
+> `.dfont`. Still to come: favourites, the glyph map and the Info panel. See
 > [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
 
 ---
@@ -17,8 +18,10 @@ and run it.
 - **Open one font, get the whole folder.** Double-click any font file and every
   supported font in that folder loads into a scrollable list — no opening files
   one at a time.
-- **All Fonts view.** Every font in the folder rendered at once, each in its own
-  typeface.
+- **Two views, one switch.** *Single font* shows one face large with text you
+  control; *Gallery* shows every font in the folder at once, each drawn in its own
+  typeface, at Small, Medium, Large or Extra Large. Double-click any font in the
+  gallery to open it large.
 - **Favorites.** Star a font and the file is *copied* into a `Favorite Fonts`
   folder next to the exe. Un-starring sends that copy to the Recycle Bin.
 - **Custom preview text,** a 6–288 pt size slider and a waterfall of sizes.
@@ -60,7 +63,9 @@ companion files, not fonts. Not supported in v1.0: `.eot`, SVG fonts, BMFont
 | Toggle favorite | `Ctrl+D` |
 | Show favorites folder | `Ctrl+Shift+F` |
 | Focus search (`Esc` clears) | `Ctrl+F` |
-| Switch tabs | `Ctrl+1` / `2` / `3` / `4` |
+| Single font view | `Ctrl+1` |
+| Gallery view | `Ctrl+2` |
+| Flip between the two | `Ctrl+Tab` |
 | Bigger / smaller preview | `Ctrl+=` / `Ctrl+-`, or `Ctrl` + mouse wheel |
 | Rescan folder | `F5` |
 | Toggle subfolders | `Ctrl+Shift+S` |

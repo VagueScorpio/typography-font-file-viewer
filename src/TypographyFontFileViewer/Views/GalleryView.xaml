@@ -19,20 +19,44 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Size" VerticalAlignment="Center" Margin="0,0,8,0" />
 
-                <Slider Width="200"
+                <!-- Named sizes, and the slider for anything in between. -->
+                <Border Style="{StaticResource SegmentTrack}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource SegmentButton}" GroupName="GallerySize"
+                                     Content="S" Padding="11,3" ToolTip="Small — 16 pt"
+                                     IsChecked="{Binding Gallery.GallerySize, Mode=TwoWay,
+                                                 Converter={StaticResource DoubleEquals}, ConverterParameter=16}" />
+                        <RadioButton Style="{StaticResource SegmentButton}" GroupName="GallerySize"
+                                     Content="M" Padding="11,3" ToolTip="Medium — 28 pt"
+                                     IsChecked="{Binding Gallery.GallerySize, Mode=TwoWay,
+                                                 Converter={StaticResource DoubleEquals}, ConverterParameter=28}" />
+                        <RadioButton Style="{StaticResource SegmentButton}" GroupName="GallerySize"
+                                     Content="L" Padding="11,3" ToolTip="Large — 44 pt"
+                                     IsChecked="{Binding Gallery.GallerySize, Mode=TwoWay,
+                                                 Converter={StaticResource DoubleEquals}, ConverterParameter=44}" />
+                        <RadioButton Style="{StaticResource SegmentButton}" GroupName="GallerySize"
+                                     Content="XL" Padding="9,3" ToolTip="Extra large — 72 pt"
+                                     IsChecked="{Binding Gallery.GallerySize, Mode=TwoWay,
+                                                 Converter={StaticResource DoubleEquals}, ConverterParameter=72}" />
+                    </StackPanel>
+                </Border>
+
+                <Slider Width="150" Margin="12,0,0,0"
                         Minimum="8" Maximum="96"
                         IsSnapToTickEnabled="True" TickFrequency="1"
                         VerticalAlignment="Center"
+                        ToolTip="Any size between the presets"
                         Value="{Binding Gallery.GallerySize, Mode=TwoWay}" />
 
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"
-                           Text="{Binding Gallery.GallerySize, StringFormat={}{0:0} pt}"
+                           MinWidth="66"
+                           Text="{Binding Gallery.SizeName}"
                            Foreground="{StaticResource MutedText}" />
 
-                <TextBlock Margin="20,0,0,0" VerticalAlignment="Center"
+                <TextBlock Margin="16,0,0,0" VerticalAlignment="Center"
                            FontSize="11"
                            Foreground="{StaticResource MutedText}"
-                           Text="Every font in this folder, drawn in its own face. Click to select, double-click for Preview." />
+                           Text="Double-click a font to open it large." />
             </StackPanel>
         </Border>
 

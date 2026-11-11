@@ -13,5 +13,59 @@
         <controls:NullToVisibilityConverter x:Key="NullToVisibility" />
         <controls:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibility" />
         <controls:EmptyToVisibilityConverter x:Key="EmptyToVisibility" />
+        <controls:EnumToBooleanConverter x:Key="EnumToBoolean" />
+        <controls:EnumToVisibilityConverter x:Key="EnumToVisibility" />
+        <controls:DoubleEqualsConverter x:Key="DoubleEquals" />
+
+        <!--
+            A segment of a sliding switch: radio buttons that look like one control, with
+            the selected one raised out of the track. Two clicks become one compared with
+            a dropdown, and both choices stay visible.
+        -->
+        <Style x:Key="SegmentButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource MutedText}" />
+            <Setter Property="Padding" Value="14,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Chip"
+                                Background="Transparent"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.FontWeight="{TemplateBinding FontWeight}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="White" />
+                                <Setter TargetName="Chip" Property="BorderBrush" Value="#FFCFCFC8" />
+                                <Setter TargetName="Chip" Property="BorderThickness" Value="1" />
+                                <Setter Property="Foreground" Value="#FF1D2630" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Chip" Property="Background" Value="#22000000" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The track the segments sit in. -->
+        <Style x:Key="SegmentTrack" TargetType="Border">
+            <Setter Property="Background" Value="#FFE9E9E3" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="2" />
+        </Style>
     </Application.Resources>
 </Application>

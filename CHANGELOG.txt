@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - View switch: single font or gallery
     - Phase 4: the All Fonts gallery
     - Phase 3: folder browsing and the Preview tab
     - Phase 2: WOFF and WOFF 2.0
@@ -16,6 +17,45 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+View switch: single font or gallery   (requested, outside the phase plan)
+  WHAT: The tab strip is gone. A segmented switch in the header moves between
+        two views — Single font and Gallery — and the gallery gained four named
+        sizes: S (16 pt), M (28 pt), L (44 pt) and XL (72 pt), alongside the
+        slider it already had. New ViewModels/ViewMode.cs and three converters;
+        MainWindow now shows one of two views rather than hosting tabs.
+  WHY:  Asked for directly. Both views already existed as tabs, but tabs say
+        "panels of the same thing", and these are two answers to different
+        questions: "what does this font look like?" against "which of these
+        fonts do I want?". A switch says that, and the named sizes save aiming
+        at a slider for the sizes anyone actually wants.
+  HOW:  Radio buttons sharing a group, styled as one control, bound to a
+        ViewMode enum through EnumToBooleanConverter; the views themselves swap
+        on EnumToVisibilityConverter. The size presets are positions on the same
+        scale the slider moves along rather than a separate setting, so picking
+        Large and dragging the slider to 44 do the same thing and a preset
+        lights up whenever the slider lands on it. Both views stay loaded, so
+        switching keeps each one's scroll position; the hidden one unloads its
+        rows, which cancels their renders.
+
+  KEYS: Ctrl+1 for single font, Ctrl+2 for gallery, Ctrl+Tab to flip. Ctrl+=
+        and Ctrl+- resize whichever view is showing. Double-clicking a gallery
+        row still opens that font in the single-font view.
+
+  DEVIATION FROM THE BLUEPRINT (Section 8), and why: the blueprint draws four
+        flat tabs — Preview, All Fonts, Glyphs, Info. Glyphs and Info are both
+        about the one selected font, so they belong inside the single-font view
+        rather than beside the gallery. Phase 6 will add them there, as a tab
+        strip within that view, which leaves the top-level switch meaning what
+        it says: one font, or all of them. The single-font view hosts the
+        preview directly for now, since a tab strip with one tab on it is just
+        clutter.
+
+  VERIFIED: 183 tests, all passing, zero build warnings. The switch, the toggle,
+        double-click-to-open, per-view resizing and selection surviving a switch
+        all have tests, as do the three converters and the preset naming. Small
+        fits ten fonts on screen with the whole pangram visible where Medium
+        fits seven and clips them.
 
 Phase 4: the All Fonts gallery
   WHAT: The second tab: every font in the folder, each drawn in its own face.

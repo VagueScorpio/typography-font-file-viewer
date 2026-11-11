@@ -27,8 +27,9 @@
         <KeyBinding Key="Home" Modifiers="Control" Command="{Binding FirstFontCommand}" />
         <KeyBinding Key="End" Modifiers="Control" Command="{Binding LastFontCommand}" />
         <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
-        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ShowTabCommand}" CommandParameter="0" />
-        <KeyBinding Key="D2" Modifiers="Control" Command="{Binding ShowTabCommand}" CommandParameter="1" />
+        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ShowViewCommand}" CommandParameter="SingleFont" />
+        <KeyBinding Key="D2" Modifiers="Control" Command="{Binding ShowViewCommand}" CommandParameter="Gallery" />
+        <KeyBinding Key="Tab" Modifiers="Control" Command="{Binding ToggleViewCommand}" />
     </Window.InputBindings>
 
     <DockPanel>
@@ -46,6 +47,15 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem Header="_View">
+                <MenuItem Header="_Single font" InputGestureText="Ctrl+1"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsSingleFont, Mode=OneWay}"
+                          Command="{Binding ShowViewCommand}" CommandParameter="SingleFont" />
+                <MenuItem Header="_Gallery" InputGestureText="Ctrl+2"
+                          IsCheckable="True"
+                          IsChecked="{Binding IsGallery, Mode=OneWay}"
+                          Command="{Binding ShowViewCommand}" CommandParameter="Gallery" />
+                <Separator />
                 <MenuItem Header="_Next font" InputGestureText="Ctrl+Down"
                           Command="{Binding NextFontCommand}" />
                 <MenuItem Header="_Previous font" InputGestureText="Ctrl+Up"
@@ -117,26 +127,68 @@
 
             <DockPanel Grid.Column="2">
 
-                <!-- The selected font's name, above the tabs. -->
+                <!-- The selected font's name, and the switch between the two views. -->
                 <Border DockPanel.Dock="Top"
                         Padding="12,8"
                         BorderBrush="{StaticResource PanelBorder}"
                         BorderThickness="0,0,0,1">
-                    <TextBlock Text="{Binding SelectedFont.DisplayName}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding SelectedFont.DisplayName}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsSingleFont, Converter={StaticResource BooleanToVisibility}}" />
+
+                        <TextBlock Grid.Column="0"
+                                   Text="All fonts in this folder"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding IsGallery, Converter={StaticResource BooleanToVisibility}}" />
+
+                        <Border Grid.Column="1" Style="{StaticResource SegmentTrack}">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}"
+                                             GroupName="ViewMode"
+                                             Content="Single font"
+                                             ToolTip="One font, large. Ctrl+1"
+                                             IsChecked="{Binding CurrentView, Mode=TwoWay,
+                                                         Converter={StaticResource EnumToBoolean},
+                                                         ConverterParameter=SingleFont}" />
+                                <RadioButton Style="{StaticResource SegmentButton}"
+                                             GroupName="ViewMode"
+                                             Content="Gallery"
+                                             ToolTip="Every font at once. Ctrl+2"
+                                             IsChecked="{Binding CurrentView, Mode=TwoWay,
+                                                         Converter={StaticResource EnumToBoolean},
+                                                         ConverterParameter=Gallery}" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Border>
 
-                <TabControl x:Name="Tabs" BorderThickness="0" Padding="0"
-                            SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
-                    <TabItem Header="Preview">
-                        <views:PreviewView DataContext="{Binding Preview}" />
-                    </TabItem>
-                    <TabItem Header="All Fonts">
-                        <views:GalleryView x:Name="Gallery" RowActivated="OnGalleryRowActivated" />
-                    </TabItem>
-                </TabControl>
+                <!-- Both views stay loaded so switching keeps each one's scroll position.
+                     The hidden one unloads its rows, which cancels their renders. -->
+                <Grid>
+                    <views:PreviewView DataContext="{Binding Preview}"
+                                       Visibility="{Binding DataContext.CurrentView,
+                                                    RelativeSource={RelativeSource AncestorType=Window},
+                                                    Converter={StaticResource EnumToVisibility},
+                                                    ConverterParameter=SingleFont}" />
+
+                    <views:GalleryView x:Name="Gallery"
+                                       RowActivated="OnGalleryRowActivated"
+                                       Visibility="{Binding CurrentView,
+                                                    Converter={StaticResource EnumToVisibility},
+                                                    ConverterParameter=Gallery}" />
+                </Grid>
             </DockPanel>
 
             <!-- Shown before anything has been opened. -->

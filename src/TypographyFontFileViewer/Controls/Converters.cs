@@ -23,6 +23,70 @@ public sealed class NullToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>
+/// True when the bound enum equals the parameter, and sets it back when checked.
+/// </summary>
+/// <remarks>
+/// This is what lets a pair of radio buttons drive a single enum property, which is how
+/// the view switch and the gallery's size presets both work.
+/// </remarks>
+public sealed class EnumToBooleanConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null && parameter is not null
+        && string.Equals(value.ToString(), parameter.ToString(), StringComparison.Ordinal);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        // Only the button being turned on should write; the one turning off must not.
+        if (value is not true || parameter is not string name) return Binding.DoNothing;
+
+        Type enumType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        return enumType.IsEnum && Enum.TryParse(enumType, name, out object? parsed)
+            ? parsed
+            : Binding.DoNothing;
+    }
+}
+
+/// <summary>Shows an element only while the bound enum equals the parameter.</summary>
+public sealed class EnumToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is not null && parameter is not null
+        && string.Equals(value.ToString(), parameter.ToString(), StringComparison.Ordinal)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>
+/// True when a bound number equals the parameter, and sets it back when checked.
+/// </summary>
+/// <remarks>
+/// The gallery's size presets are points on the same scale the slider moves along, so
+/// picking Large and dragging the slider to 44 are the same thing, and the preset
+/// highlights itself when the slider happens to land on it.
+/// </remarks>
+public sealed class DoubleEqualsConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is double number
+        && parameter is string text
+        && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double target)
+        && Math.Abs(number - target) < 0.5;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not true || parameter is not string text) return Binding.DoNothing;
+
+        return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double target)
+            ? target
+            : Binding.DoNothing;
+    }
+}
+
 /// <summary>Shows an element only when the bound flag is false.</summary>
 public sealed class InverseBooleanToVisibilityConverter : IValueConverter
 {

@@ -57,22 +57,42 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial string? Message { get; set; }
 
-    /// <summary>Which tab is showing: 0 is Preview, 1 is All Fonts.</summary>
+    /// <summary>Which of the two views is showing.</summary>
     [ObservableProperty]
-    public partial int SelectedTabIndex { get; set; }
+    [NotifyPropertyChangedFor(nameof(IsGallery))]
+    [NotifyPropertyChangedFor(nameof(IsSingleFont))]
+    public partial ViewMode CurrentView { get; set; } = ViewMode.SingleFont;
+
+    public bool IsGallery => CurrentView == ViewMode.Gallery;
+
+    public bool IsSingleFont => CurrentView == ViewMode.SingleFont;
 
     [RelayCommand]
-    private void ShowTab(string? index)
+    private void ShowView(string? mode)
     {
-        if (int.TryParse(index, out int value)) SelectedTabIndex = value;
+        if (Enum.TryParse(mode, out ViewMode parsed)) CurrentView = parsed;
+    }
+
+    /// <summary>Flips between the two views, for the keyboard.</summary>
+    [RelayCommand]
+    private void ToggleView()
+        => CurrentView = CurrentView == ViewMode.Gallery ? ViewMode.SingleFont : ViewMode.Gallery;
+
+    /// <summary>
+    /// Opens one font large, which is what double-clicking a gallery row means.
+    /// </summary>
+    public void OpenInSingleView(FontItemViewModel? font)
+    {
+        if (font is not null) SelectedFont = font;
+        CurrentView = ViewMode.SingleFont;
     }
 
     /// <summary>
-    /// Resizes whichever tab is in front, so Ctrl+= means the same thing everywhere.
+    /// Resizes whichever view is showing, so Ctrl+= means the same thing in both.
     /// </summary>
     public void AdjustSize(double delta)
     {
-        if (SelectedTabIndex == 1) Gallery.AdjustSize(delta);
+        if (CurrentView == ViewMode.Gallery) Gallery.AdjustSize(delta);
         else Preview.AdjustSize(delta);
     }
 
