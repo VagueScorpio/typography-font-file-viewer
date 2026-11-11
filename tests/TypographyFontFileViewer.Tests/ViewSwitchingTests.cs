@@ -157,6 +157,97 @@ public class ViewSwitchingTests : IDisposable
         Assert.Same(selected, model.SelectedFont);
     }
 
+    // --- The nested panel strip -------------------------------------------------
+
+    [Fact]
+    public void TheSingleFontViewOpensOnPreview()
+    {
+        using var service = new RenderService();
+        using var model = new MainViewModel(service);
+
+        Assert.Equal(SingleFontPanel.Preview, model.CurrentPanel);
+    }
+
+    [Fact]
+    public void ShowPanel_SwitchesToTheSingleFontViewAsWellAsThePanel()
+    {
+        using var service = new RenderService();
+        using var model = new MainViewModel(service);
+
+        model.CurrentView = ViewMode.Gallery;
+        model.ShowPanelCommand.Execute("Preview");
+
+        // Asking for a panel implies asking for the view that holds it.
+        Assert.Equal(ViewMode.SingleFont, model.CurrentView);
+        Assert.Equal(SingleFontPanel.Preview, model.CurrentPanel);
+    }
+
+    /// <summary>
+    /// Ctrl+3 and Ctrl+4 name panels that Phase 6 has not built yet.
+    /// </summary>
+    /// <remarks>
+    /// They still switch to the single-font view, because that is half of what the user
+    /// asked for, and settle on Preview rather than selecting a panel that is not on the
+    /// strip. When Phase 6 adds the other two, raising AvailablePanelCount is all that
+    /// changes here.
+    /// </remarks>
+    [Theory]
+    [InlineData("Glyphs")]
+    [InlineData("Info")]
+    public void APanelThatDoesNotExistYet_FallsBackToPreview(string panel)
+    {
+        using var service = new RenderService();
+        using var model = new MainViewModel(service);
+
+        model.CurrentView = ViewMode.Gallery;
+        model.ShowPanelCommand.Execute(panel);
+
+        Assert.Equal(ViewMode.SingleFont, model.CurrentView);
+        Assert.Equal(SingleFontPanel.Preview, model.CurrentPanel);
+    }
+
+    [Fact]
+    public void AnUnrecognisedPanel_ChangesNothing()
+    {
+        using var service = new RenderService();
+        using var model = new MainViewModel(service);
+
+        model.CurrentView = ViewMode.Gallery;
+        model.ShowPanelCommand.Execute("Nonsense");
+
+        Assert.Equal(ViewMode.Gallery, model.CurrentView);
+        Assert.Equal(SingleFontPanel.Preview, model.CurrentPanel);
+    }
+
+    [Fact]
+    public void ThePanelStrip_ListsItsPanelsInTheOrderTheyAreShown()
+    {
+        // The enum values are the tab indices, so their order is the strip's order.
+        Assert.Equal(0, (int)SingleFontPanel.Preview);
+        Assert.Equal(1, (int)SingleFontPanel.Glyphs);
+        Assert.Equal(2, (int)SingleFontPanel.Info);
+
+        Assert.InRange(MainViewModel.AvailablePanelCount, 1, 3);
+    }
+
+    [Fact]
+    public void EnumToIndex_MapsBothWaysAndClampsPastTheEnd()
+    {
+        var converter = new EnumToIndexConverter();
+
+        Assert.Equal(0, converter.Convert(SingleFontPanel.Preview, typeof(int), null, CultureInfo.InvariantCulture));
+        Assert.Equal(2, converter.Convert(SingleFontPanel.Info, typeof(int), null, CultureInfo.InvariantCulture));
+
+        Assert.Equal(SingleFontPanel.Glyphs,
+            converter.ConvertBack(1, typeof(SingleFontPanel), null, CultureInfo.InvariantCulture));
+
+        // A tab strip shorter than the enum reports -1 when it has no selection.
+        Assert.Equal(SingleFontPanel.Preview,
+            converter.ConvertBack(-1, typeof(SingleFontPanel), null, CultureInfo.InvariantCulture));
+        Assert.Equal(SingleFontPanel.Preview,
+            converter.ConvertBack(99, typeof(SingleFontPanel), null, CultureInfo.InvariantCulture));
+    }
+
     // --- Gallery size presets ---------------------------------------------------
 
     [Fact]

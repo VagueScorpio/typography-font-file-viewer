@@ -9,7 +9,7 @@ and run it.
 > `Ctrl+Down` — and **Gallery**, every font in the folder drawn in its own face at your
 > choice of four sizes, tested at 1,361 rows. Every format v1.0 promises opens except
 > `.dfont`. Still to come: favourites, the glyph map and the Info panel. See
-> [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
+> [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ---
 
@@ -63,9 +63,10 @@ companion files, not fonts. Not supported in v1.0: `.eot`, SVG fonts, BMFont
 | Toggle favorite | `Ctrl+D` |
 | Show favorites folder | `Ctrl+Shift+F` |
 | Focus search (`Esc` clears) | `Ctrl+F` |
-| Single font view | `Ctrl+1` |
+| Single font view — Preview | `Ctrl+1` |
 | Gallery view | `Ctrl+2` |
-| Flip between the two | `Ctrl+Tab` |
+| Single font view — Glyphs, Info | `Ctrl+3`, `Ctrl+4` (Phase 6) |
+| Flip between the two views | `Ctrl+Tab` |
 | Bigger / smaller preview | `Ctrl+=` / `Ctrl+-`, or `Ctrl` + mouse wheel |
 | Rescan folder | `F5` |
 | Toggle subfolders | `Ctrl+Shift+S` |
@@ -181,7 +182,7 @@ Three decisions carry most of the design:
   you can delete, rename or un-favorite a font while it is on screen.
 
 Full detail — module specs, the WOFF2 decoder, the favorites matching rules — is in
-[the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.0.md).
+[the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ## Roadmap
 

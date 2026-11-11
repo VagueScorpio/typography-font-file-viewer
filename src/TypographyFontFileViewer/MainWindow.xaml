@@ -27,8 +27,13 @@
         <KeyBinding Key="Home" Modifiers="Control" Command="{Binding FirstFontCommand}" />
         <KeyBinding Key="End" Modifiers="Control" Command="{Binding LastFontCommand}" />
         <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
-        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ShowViewCommand}" CommandParameter="SingleFont" />
+        <!-- The numbers run 1 to 4 across the whole window, as they did when these were
+             four flat tabs: 1, 3 and 4 are panels of the single-font view, 2 is the
+             gallery. Ctrl+3 and Ctrl+4 fall back to Preview until Phase 6 builds them. -->
+        <KeyBinding Key="D1" Modifiers="Control" Command="{Binding ShowPanelCommand}" CommandParameter="Preview" />
         <KeyBinding Key="D2" Modifiers="Control" Command="{Binding ShowViewCommand}" CommandParameter="Gallery" />
+        <KeyBinding Key="D3" Modifiers="Control" Command="{Binding ShowPanelCommand}" CommandParameter="Glyphs" />
+        <KeyBinding Key="D4" Modifiers="Control" Command="{Binding ShowPanelCommand}" CommandParameter="Info" />
         <KeyBinding Key="Tab" Modifiers="Control" Command="{Binding ToggleViewCommand}" />
     </Window.InputBindings>
 
@@ -50,7 +55,7 @@
                 <MenuItem Header="_Single font" InputGestureText="Ctrl+1"
                           IsCheckable="True"
                           IsChecked="{Binding IsSingleFont, Mode=OneWay}"
-                          Command="{Binding ShowViewCommand}" CommandParameter="SingleFont" />
+                          Command="{Binding ShowPanelCommand}" CommandParameter="Preview" />
                 <MenuItem Header="_Gallery" InputGestureText="Ctrl+2"
                           IsCheckable="True"
                           IsChecked="{Binding IsGallery, Mode=OneWay}"
@@ -177,11 +182,10 @@
                 <!-- Both views stay loaded so switching keeps each one's scroll position.
                      The hidden one unloads its rows, which cancels their renders. -->
                 <Grid>
-                    <views:PreviewView DataContext="{Binding Preview}"
-                                       Visibility="{Binding DataContext.CurrentView,
-                                                    RelativeSource={RelativeSource AncestorType=Window},
-                                                    Converter={StaticResource EnumToVisibility},
-                                                    ConverterParameter=SingleFont}" />
+                    <views:SingleFontView
+                        Visibility="{Binding CurrentView,
+                                     Converter={StaticResource EnumToVisibility},
+                                     ConverterParameter=SingleFont}" />
 
                     <views:GalleryView x:Name="Gallery"
                                        RowActivated="OnGalleryRowActivated"

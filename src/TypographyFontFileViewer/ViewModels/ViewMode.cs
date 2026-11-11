@@ -18,3 +18,23 @@ public enum ViewMode
     /// <summary>Every font in the folder, each drawn in its own face.</summary>
     Gallery = 1,
 }
+
+/// <summary>
+/// The panels inside the single-font view. All three describe the one selected font.
+/// </summary>
+/// <remarks>
+/// The order is the order of the strip, and the values are its tab indices. Glyphs and
+/// Info arrive in Phase 6; until then the strip shows Preview alone and selecting either
+/// of the others falls back to it.
+/// </remarks>
+public enum SingleFontPanel
+{
+    /// <summary>The font drawn at a size you choose, with text you choose.</summary>
+    Preview = 0,
+
+    /// <summary>Every character the font maps. Phase 6.</summary>
+    Glyphs = 1,
+
+    /// <summary>What the font says about itself. Phase 6.</summary>
+    Info = 2,
+}

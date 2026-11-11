@@ -87,6 +87,33 @@ public sealed class DoubleEqualsConverter : IValueConverter
     }
 }
 
+/// <summary>
+/// Maps an enum to the index of the tab that shows it, and back again.
+/// </summary>
+/// <remarks>
+/// The panel strip inside the single-font view will not have all its tabs until Phase 6,
+/// so an index past the end of the strip reads back as the first panel rather than as a
+/// selection that does not exist.
+/// </remarks>
+public sealed class EnumToIndexConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is null ? 0 : System.Convert.ToInt32(value, culture);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        Type enumType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (!enumType.IsEnum) return Binding.DoNothing;
+
+        int index = value is null ? 0 : System.Convert.ToInt32(value, culture);
+        if (index < 0) index = 0;
+
+        return Enum.IsDefined(enumType, index)
+            ? Enum.ToObject(enumType, index)
+            : Enum.ToObject(enumType, 0);
+    }
+}
+
 /// <summary>Shows an element only when the bound flag is false.</summary>
 public sealed class InverseBooleanToVisibilityConverter : IValueConverter
 {

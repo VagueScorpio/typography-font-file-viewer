@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Blueprint v1.1: nested panels replace the four flat tabs
     - View switch: single font or gallery
     - Phase 4: the All Fonts gallery
     - Phase 3: folder browsing and the Preview tab
@@ -17,6 +18,42 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Blueprint v1.1: nested panels replace the four flat tabs
+  WHAT: docs/Typography-Font-File-Viewer-Blueprint-v1.0.md is now
+        ...-v1.1.md, amended so the nested design is the specification rather
+        than a deviation from it. In the app, Views/SingleFontView.xaml holds a
+        panel strip that Preview sits on and that Glyphs and Info join in
+        Phase 6.
+  WHY:  Asked for, and the right way round. The four flat tabs of v1.0 put the
+        gallery — a view of a whole folder — on the same footing as Glyphs and
+        Info, which describe one selected font. Leaving the blueprint saying one
+        thing while the app did another would have meant every later phase
+        arguing with its own specification.
+  HOW:  Amended Section 4.1 (the layer diagram now nests the three panels under
+        SingleFontView), Section 8 (both views drawn separately, a new 8.1a on
+        the switch, and 8.3-8.6 renamed from "Tab n" to the view or panel they
+        describe), Section 9 (the keyboard table), Section 10 (settings store a
+        selected view and a selected panel rather than a selected tab),
+        Section 12 (Phases 3 and 6 reworded, Phase 6 told where the panels go)
+        and Section 14. A revision-history section at the top records what
+        changed and why. Nothing about formats, decoding, rendering or
+        favourites moved.
+
+  KEYS: the numbers still run 1 to 4 across the whole window, as they did when
+        these were four flat tabs — Ctrl+1 Preview, Ctrl+2 Gallery, Ctrl+3
+        Glyphs, Ctrl+4 Info — because 3 and 4 switch to the single-font view and
+        select the panel. Until Phase 6 builds them, Ctrl+3 and Ctrl+4 switch to
+        the single-font view and settle on Preview rather than selecting a panel
+        that is not on the strip.
+
+  VERIFIED: 190 tests, all passing, zero build warnings. The fallback for a
+        panel that does not exist yet, the view-and-panel coupling, the enum to
+        tab-index mapping and its clamping all have tests.
+
+  KNOWN COSMETIC POINT: the panel strip currently shows one tab, which looks
+        sparse. Phase 6 fills it. Building the strip now rather than later keeps
+        Phase 6 to adding two panels instead of restructuring the window again.
 
 View switch: single font or gallery   (requested, outside the phase plan)
   WHAT: The tab strip is gone. A segmented switch in the header moves between

@@ -67,10 +67,36 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public bool IsSingleFont => CurrentView == ViewMode.SingleFont;
 
+    /// <summary>Which panel of the single-font view is showing.</summary>
+    [ObservableProperty]
+    public partial SingleFontPanel CurrentPanel { get; set; } = SingleFontPanel.Preview;
+
+    /// <summary>
+    /// How many panels the strip actually offers. Glyphs and Info arrive in Phase 6.
+    /// </summary>
+    public const int AvailablePanelCount = 1;
+
     [RelayCommand]
     private void ShowView(string? mode)
     {
         if (Enum.TryParse(mode, out ViewMode parsed)) CurrentView = parsed;
+    }
+
+    /// <summary>
+    /// Switches to the single-font view and selects one of its panels.
+    /// </summary>
+    /// <remarks>
+    /// This is what Ctrl+1, Ctrl+3 and Ctrl+4 do, so the numbers still run 1 to 4 across
+    /// the whole window as they did when these were four flat tabs. A panel that has not
+    /// been built yet falls back to Preview rather than leaving an empty strip selected.
+    /// </remarks>
+    [RelayCommand]
+    private void ShowPanel(string? panel)
+    {
+        if (!Enum.TryParse(panel, out SingleFontPanel parsed)) return;
+
+        CurrentView = ViewMode.SingleFont;
+        CurrentPanel = (int)parsed < AvailablePanelCount ? parsed : SingleFontPanel.Preview;
     }
 
     /// <summary>Flips between the two views, for the keyboard.</summary>

@@ -16,6 +16,7 @@
         <controls:EnumToBooleanConverter x:Key="EnumToBoolean" />
         <controls:EnumToVisibilityConverter x:Key="EnumToVisibility" />
         <controls:DoubleEqualsConverter x:Key="DoubleEquals" />
+        <controls:EnumToIndexConverter x:Key="EnumToIndex" />
 
         <!--
             A segment of a sliding switch: radio buttons that look like one control, with

@@ -1,7 +1,24 @@
-# Typography Font File Viewer — Architecture, Design & Build Blueprint (v1.0)
+# Typography Font File Viewer — Architecture, Design & Build Blueprint (v1.1)
 
 > **How to use this file:** Put it in an empty project folder, open Claude Code there, and say:
-> *"Read Typography-Font-File-Viewer-Blueprint-v1.0.md and build the app phase by phase. Stop after each phase, show me what works, and wait for my OK before starting the next."*
+> *"Read Typography-Font-File-Viewer-Blueprint-v1.1.md and build the app phase by phase. Stop after each phase, show me what works, and wait for my OK before starting the next."*
+
+---
+
+## Revision history
+
+**v1.1 — two views with a nested panel strip, replacing four flat tabs.**
+
+v1.0 drew Preview, All Fonts, Glyphs and Info as four tabs side by side. That put the
+gallery, which is about a whole folder, on the same footing as Glyphs and Info, which are
+about the one selected font. Asking for "Glyphs" while looking at 1,300 fonts answers
+nothing, and the flat arrangement gave no hint of that.
+
+v1.1 separates the two questions. A **view switch** chooses between *Single font* and
+*Gallery*: one font large, or all of them at once. Inside the single-font view a **panel
+strip** chooses between *Preview*, *Glyphs* and *Info*, all three of which describe the
+one font in hand. Sections 4.1, 8, 9, 10, 12 and 14 are amended to match. Nothing about
+font formats, decoding, rendering or favourites changes from v1.0.
 
 ---
 
@@ -98,8 +115,9 @@ Detect formats by **magic bytes first, extension second**. A `.ttf` that is real
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ UI LAYER (WPF, MVVM)                                             │
-│  MainWindow ─ FontListView ─ PreviewView ─ GalleryView           │
-│              GlyphMapView ─ InfoView ─ StatusBar                 │
+│  MainWindow ─ FontListView ─ StatusBar                           │
+│    ├─ SingleFontView ─ PreviewView ─ GlyphMapView ─ InfoView     │
+│    └─ GalleryView                                                │
 │  ViewModels: MainVM, FontItemVM, PreviewVM, GalleryVM,           │
 │              GlyphMapVM, InfoVM                                  │
 └───────────────▲─────────────────────────────────┬────────────────┘
@@ -284,13 +302,18 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 
 ### 8.1 Main window
 
+There are **two views**, chosen by a switch in the header, and the single-font view holds
+**three panels** of its own.
+
+**Single font view** — one font, large.
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ File  View  Help                                                           │
 │ [Open…] [Open Folder…] [★ Favorites] [🔍 Search fonts…        ] [☐ Subfolders]│
 ├────────────────────────┬───────────────────────────────────────────────────┤
-│ D:\Fonts               │  Roboto Slab Bold                       [★]       │
-│ 128 fonts · 6 ★        │  [ Preview ] [ All Fonts ] [ Glyphs ] [ Info ]    │
+│ D:\Fonts               │ Roboto Slab Bold  [★]  ( Single font │ Gallery )   │
+│ 128 fonts · 6 ★        │ ┌ Preview ┬ Glyphs ┬ Info ┐                       │
 │ ────────────────────── │ ───────────────────────────────────────────────── │
 │ ★ Roboto Slab Bold  TTF│  Text: [The quick brown fox jumps over…   ][▾]    │
 │   Roboto Slab Light TTF│  Size: [──────●────────] 48 pt   [◐ Dark bg]      │
@@ -307,6 +330,46 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Gallery view** — every font in the folder at once.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ File  View  Help                                                           │
+│ [Open…] [Open Folder…] [★ Favorites] [🔍 Search fonts…        ] [☐ Subfolders]│
+├────────────────────────┬───────────────────────────────────────────────────┤
+│ D:\Fonts               │ All fonts in this folder ( Single font │ Gallery ) │
+│ 128 fonts · 6 ★        │ Size: ( S │ M │ L │ XL ) [───●───] Medium          │
+│ ────────────────────── │ ───────────────────────────────────────────────── │
+│ ★ Roboto Slab Bold  TTF│  RobotoSlab-Bold.ttf · Roboto Slab Bold  ★        │
+│   Roboto Slab Light TTF│  The quick brown fox jumps over the lazy dog      │
+│   Inter Regular   WOFF2│  RobotoSlab-Light.ttf · Roboto Slab Light         │
+│   …                    │  The quick brown fox jumps over the lazy dog      │
+│                        │  Inter-Regular.woff2 · Inter                      │
+│                        │  The quick brown fox jumps over the lazy dog      │
+│                        │  ⚠ broken-font.otf                                │
+│                        │  This is not a font file FreeType recognises.     │
+├────────────────────────┴───────────────────────────────────────────────────┤
+│ RobotoSlab-Bold.ttf · TrueType · 1,284 glyphs · Font 4 of 128       v1.0   │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why two views rather than four tabs.** The gallery answers "which of these fonts do I
+want?"; Preview, Glyphs and Info all answer "what is *this* font like?". Flattening them
+into one row of tabs would put a folder-wide view beside three font-specific ones and
+offer "Glyphs" while a thousand fonts are on screen. The switch names the real choice, and
+the panel strip sits where it belongs — inside the view that has a font selected.
+
+### 8.1a The view switch
+- A segmented control in the header: **Single font** and **Gallery**, the chosen one
+  raised out of the track. One click to switch, and both choices stay visible — which a
+  dropdown would not manage in one click or one glance.
+- The heading beside it names what is showing: the selected font's display name in the
+  single-font view, "All fonts in this folder" in the gallery.
+- Both views stay loaded, so switching keeps each one's scroll position. The hidden view
+  unloads its rows, which cancels any renders they had in flight.
+- The selected font is shared: selecting in either view selects in the other, and the
+  sidebar always agrees with both.
+
 ### 8.2 Left sidebar: font list
 - Virtualized `ListBox` (`VirtualizingPanel.IsVirtualizing=True`, `VirtualizationMode=Recycling`).
 - Row: star, display name (family + style once known, file name until then), format badge, and "(n/m)" for collection faces. A ⚠ icon marks files that failed to load; the tooltip shows the reason.
@@ -314,7 +377,7 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 - The header shows the current folder, total count, and favorites count.
 - Sort options (View menu): File name (default), Family name, Format.
 
-### 8.3 Tab 1: Preview
+### 8.3 Single font, panel 1: Preview
 - Preview text box with a dropdown of presets: pangram, `ABC…Z`, `abc…z`, `0123456789`, punctuation `!@#$%^&*()…`, and "Custom" (whatever the user typed last, remembered).
 - Size slider, 6–288 pt, plus a numeric box. **Ctrl+mouse-wheel** over the preview changes the size.
 - Large rendering of the text at the chosen size, word-wrapped to the panel width.
@@ -322,21 +385,21 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 - Dark-background toggle (white on near-black vs. black on white).
 - Re-render on every keystroke, debounced to 30 ms. Each new request cancels the previous one.
 
-### 8.4 Tab 2: All Fonts (gallery)
+### 8.4 Gallery view
 - Every font in the current (filtered) list, one row each. Row: small label (file name · family/style · ★), then the preview text rendered in that font at the **gallery size** (own slider, default 28 pt), single line, clipped.
 - Virtualized and recycling. Rows request renders at Low priority when they become visible and cancel when recycled. Rendered bitmaps go into an LRU (about 300 rows) so scrolling back is instant.
-- Clicking a row selects that font in the sidebar. Double-click switches to the Preview tab.
+- Clicking a row selects that font in the sidebar. Double-click opens it in the single-font view, on whichever panel was last showing there.
 - The star on each row toggles the favorite directly.
 - A row for a broken font shows the error text instead of a rendering.
 
-### 8.5 Tab 3: Glyphs
+### 8.5 Single font, panel 2: Glyphs
 - Grid of every mapped character (`FT_Get_First_Char` / `FT_Get_Next_Char`). Virtualized, so a 60,000-glyph CJK font must scroll smoothly.
 - Cell size slider (32–128 px). Each cell shows the glyph plus a small `U+XXXX` label.
 - Hover shows a tooltip: code point, glyph index, glyph name (`FT_Get_Glyph_Name` when the font has names). Click copies the character to the clipboard. Double-click shows the glyph large in an overlay with metrics (advance, bounding box).
 - Checkbox **Show unmapped glyphs**: appends glyphs with no Unicode mapping, by glyph index.
 - A "Jump to" box accepts `U+00E9`, `e9`, or the character itself.
 
-### 8.6 Tab 4: Info
+### 8.6 Single font, panel 3: Info
 - Two-column key/value list with the fields from Section 6.7, plus file path, file size, modified date, and SHA-256 (computed on demand).
 - Long fields (license, description) wrap. URLs are clickable and open in the default browser.
 - **Copy all info** button copies the list as plain text.
@@ -359,7 +422,11 @@ Think of it as a guest list checked by ID, not by name. Two files called `Roboto
 | Toggle favorite | Ctrl+D |
 | Show favorites folder | Ctrl+Shift+F |
 | Focus search | Ctrl+F (Esc clears) |
-| Switch tabs | Ctrl+1 / 2 / 3 / 4 |
+| Single font view, Preview panel | Ctrl+1 |
+| Gallery view | Ctrl+2 |
+| Single font view, Glyphs panel | Ctrl+3 |
+| Single font view, Info panel | Ctrl+4 |
+| Flip between the two views | Ctrl+Tab |
 | Bigger / smaller preview | Ctrl+= / Ctrl+− or Ctrl+wheel |
 | Rescan folder | F5 |
 | Toggle subfolders | Ctrl+Shift+S |
@@ -378,7 +445,7 @@ TypographyFontFileViewer.json        ← settings + favorites index (created on 
 Favorite Fonts\              ← created on first favorite
 ```
 
-`TypographyFontFileViewer.json` fields: window bounds/state, last folder, last selected file, recent folders, preview text, preview pt size, gallery pt size, glyph cell size, include subfolders, sort order, dark preview, selected tab, favorites index.
+`TypographyFontFileViewer.json` fields: window bounds/state, last folder, last selected file, recent folders, preview text, preview pt size, gallery pt size, glyph cell size, include subfolders, sort order, dark preview, selected view, selected panel, favorites index.
 
 - Write atomically (write `*.tmp`, then replace).
 - If the file is corrupt, rename it to `TypographyFontFileViewer.json.bad`, start with defaults, and say so in the status bar.
@@ -486,8 +553,8 @@ Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; 
 - `WoffDecoder`, `Woff2Decoder`, `Woff2GlyfReconstructor`, `SfntWriter` per Section 6.2.
 - ✅ Done when: for each test pair (`X.ttf` + `X.woff` + `X.woff2`), the decoded SFNT opens in FreeType with the **same glyph count, family name and glyph outlines** (compare a sample of rendered glyphs pixel-for-pixel), and malformed/truncated files throw `FontLoadException` without crashing.
 
-### Phase 3: Folder browsing & Preview tab
-- `FolderScanner`, sidebar list, Preview tab (text, presets, size slider, waterfall, dark bg), status bar.
+### Phase 3: Folder browsing & Preview panel
+- `FolderScanner`, sidebar list, the view switch, Preview panel (text, presets, size slider, waterfall, dark bg), status bar.
 - Open by command-line arg (file or folder), Open dialogs, drag-drop. Background metadata scan fills in names.
 - Navigation keys from Section 9.
 - ✅ Done when: opening one font loads the whole folder, the opened font is selected, and Ctrl+↓/↑ walks through every font with instant previews.
@@ -501,9 +568,13 @@ Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; 
 - Star UI in the list, the preview header and gallery rows; Ctrl+D; ★ Favorites button; Open in Explorer.
 - ✅ Done when: favoriting copies the file next to the exe, un-favoriting moves the copy to the Recycle Bin, stars are correct after restart, and stars are correct for a renamed duplicate in another folder.
 
-### Phase 6: Glyphs & Info tabs
+### Phase 6: Glyphs & Info panels
+- Both panels live **inside the single-font view**, beside Preview on its panel strip
+  (Section 8.1). Neither belongs next to the gallery: both describe one selected font.
 - Glyph grid (virtualized, cell slider, tooltips, click-to-copy, overlay, unmapped toggle, jump box).
 - Info panel with copy-all.
+- Ctrl+3 and Ctrl+4 switch to the single-font view and select the right panel, so the
+  numbers still run 1–4 across the whole window as they did in v1.0.
 - ✅ Done when: a large CJK font (for example, `C:\Windows\Fonts\msyh.ttc`) scrolls smoothly in the glyph grid and Info shows all available fields.
 
 ### Phase 7: Search, subfolders, settings, polish
@@ -539,7 +610,7 @@ Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; 
 
 ### 13.3 Manual stress list (Phase 8)
 - A folder with 2,000 fonts, including 50 broken or zero-byte files renamed to `.ttf`/`.woff2`.
-- A 30 MB+ CJK font in every tab.
+- A 30 MB+ CJK font in every view and every panel.
 - Delete, rename or overwrite the displayed font in Explorer while viewing it (no lock, no crash, F5 recovers).
 - Un-favorite while viewing the favorites folder.
 - Unicode and very long file paths; a network share; a USB drive pulled mid-scan.
@@ -563,7 +634,7 @@ Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; 
 - [ ] One `TypographyFontFileViewer.exe` runs on a PC with no .NET installed.
 - [ ] Opens TTF, OTF, TTC, OTC, WOFF, WOFF2, PFB/PFA, FON/FNT, BDF, PCF, DFONT.
 - [ ] Opening one font lists every font in its folder. Scrolling or Ctrl+↓/↑ moves through all of them.
-- [ ] The All Fonts tab shows every font rendered in its own face.
+- [ ] The Gallery view shows every font rendered in its own face, at S/M/L/XL.
 - [ ] Favorite copies to `Favorite Fonts` next to the exe. Un-favorite sends the copy to the Recycle Bin.
 - [ ] Stars stay correct after restart and for renamed duplicates.
 - [ ] Custom preview text + size slider + waterfall.
