@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 6: the Glyphs and Info panels
     - Phase 5: favourites
     - Blueprint v1.1: nested panels replace the four flat tabs
     - View switch: single font or gallery
@@ -19,6 +20,67 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 6: the Glyphs and Info panels
+  WHAT: The single-font view's panel strip is full: Preview, Glyphs and Info.
+        New Core/GlyphDetail.cs, Services/BitmapLruCache.cs,
+        ViewModels/GlyphMapViewModel.cs, ViewModels/InfoViewModel.cs,
+        Controls/GlyphCellImage.cs, Views/GlyphMapView and Views/InfoView, plus
+        MetadataReader.ReadGlyphDetail and RenderService.ReadGlyphDetailAsync.
+  WHY:  The last two things the blueprint asks a font viewer to answer: what
+        characters does this font actually have, and what does it say about
+        itself. Both describe one selected font, which is why they sit beside
+        Preview rather than beside the gallery.
+  HOW:  The glyph grid is built as rows of cells rather than one wrapping list,
+        because WPF virtualizes a stack and does not virtualize a wrap panel.
+        Microsoft YaHei's thirty thousand glyphs become a few thousand row
+        objects, and only the rows on screen exist. Each cell fetches its own
+        picture and cancels when recycled, the same arrangement the gallery
+        uses. Resizing the panel or the cells re-slices the rows.
+        The Info panel adds a row only where the font supplies something, so it
+        shows what is there rather than a column of blanks.
+
+  DETAIL WORTH KNOWING:
+        - Glyph measurements are read unscaled, in the font's own design units,
+          so they describe the glyph rather than the size it happens to be drawn
+          at and do not change as the slider moves.
+        - A click copies the character, a double-click opens the detail overlay.
+          WPF counts the clicks against the user's own double-click setting, so
+          there is no timing to track.
+        - The jump box takes U+00E9, bare hex, or the character pasted in.
+        - SHA-256 is computed on request rather than on selection: hashing a
+          30 MB CJK font to fill in a line nobody asked for would be rude.
+        - Links in the Info panel open only http and https. A font's name table
+          can hold any string at all, and handing an arbitrary scheme to the
+          shell would let a font decide what runs.
+        - The gallery's bitmap cache became generic so the glyph map could share
+          it. The two are tuned differently: the gallery holds 300 wide rows,
+          the glyph map 4,000 small squares.
+        - Ctrl+1, Ctrl+3 and Ctrl+4 now reach all three panels from either view.
+
+  VERIFIED: 259 tests, all passing, zero build warnings.
+        - Microsoft YaHei: 29,905 characters laid out, scrolled 500 wheel
+          notches into CJK Extension A with the app still responding, working
+          set 424 MB.
+        - The Info panel on a variable font shows family, names, version, format,
+          glyph and character counts, metrics, embedding permission and both
+          variation axes with their ranges and defaults.
+        - Tests cover grid chunking and re-chunking, the jump box in all its
+          forms including a character the font lacks, cell caching and its
+          limits, glyph details for an ordinary glyph and for a space, info rows
+          for variable and web fonts, links flagged and non-links not, fields
+          omitted when absent, and hashing only on request.
+
+  A TEST THAT EARNED ITS KEEP: the Phase 5 test asserting Ctrl+3 and Ctrl+4 fall
+        back to Preview failed the moment those panels existed, which is exactly
+        what it was for. It has been replaced by one checking all three panels
+        are reachable, and the fallback is now tested at the converter instead,
+        where it still matters for any panel added later.
+
+  KNOWN: with the whole Windows font folder open and a 30,000-glyph map
+        scrolled through, the working set reaches 424 MB against the blueprint's
+        400 MB target. Bounded, not leaking. Phase 8 runs the stress list
+        properly and tunes the cache limits.
 
 Phase 5: favourites
   WHAT: Starring a font copies it into a "Favorite Fonts" folder beside the exe;

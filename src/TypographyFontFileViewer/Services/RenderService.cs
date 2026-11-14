@@ -187,6 +187,19 @@ public sealed class RenderService : IDisposable
             return MetadataReader.ListGlyphs(face, includeUnmapped);
         }, priority, cancellationToken);
 
+    /// <summary>Reads one glyph's measurements, for the glyph map's detail overlay.</summary>
+    public Task<GlyphDetail> ReadGlyphDetailAsync(
+        FaceKey key,
+        GlyphEntry glyph,
+        JobPriority priority = JobPriority.High,
+        CancellationToken cancellationToken = default)
+        => _engine.EnqueueAsync(context =>
+        {
+            LoadedFace face = context.GetFace(key);
+            cancellationToken.ThrowIfCancellationRequested();
+            return FontEngineContext.ReadGlyphDetail(face, glyph.GlyphIndex, glyph.Codepoint);
+        }, priority, cancellationToken);
+
     /// <summary>Reads everything the Info tab shows for one face.</summary>
     public Task<FontInfo> ReadInfoAsync(
         FaceKey key,

@@ -1,0 +1,93 @@
+<UserControl x:Class="TypographyFontFileViewer.Views.InfoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:TypographyFontFileViewer.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance Type=vm:InfoViewModel}"
+             mc:Ignorable="d">
+
+    <DockPanel>
+
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource PanelBackground}"
+                BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Copy all info"
+                        Padding="10,3"
+                        Command="{Binding CopyAllCommand}" />
+
+                <Button Content="Compute SHA-256"
+                        Margin="8,0,0,0"
+                        Padding="10,3"
+                        Command="{Binding ComputeHashCommand}"
+                        ToolTip="Hashing a large font takes a moment, so it is done on request"
+                        Visibility="{Binding CanComputeHash, Converter={StaticResource BooleanToVisibility}}" />
+
+                <TextBlock Margin="16,0,0,0" VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedText}"
+                           Text="{Binding Status}" />
+
+                <TextBlock Margin="16,0,0,0" VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedText}"
+                           Text="Hashing…"
+                           Visibility="{Binding IsHashing, Converter={StaticResource BooleanToVisibility}}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="16,12">
+            <StackPanel>
+                <TextBlock Text="{Binding Error}"
+                           Foreground="#FFB3261E"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10"
+                           Visibility="{Binding Error, Converter={StaticResource NullToVisibility}}" />
+
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:InfoRow}">
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Label}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource MutedText}" />
+
+                                <!-- Plain values wrap; URLs are followable. -->
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Value}"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding IsLink, Converter={StaticResource InverseBooleanToVisibility}}" />
+
+                                <TextBlock Grid.Column="1"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding IsLink, Converter={StaticResource BooleanToVisibility}}">
+                                    <Hyperlink NavigateUri="{Binding Value}"
+                                               RequestNavigate="OnNavigate">
+                                        <Run Text="{Binding Value, Mode=OneWay}" />
+                                    </Hyperlink>
+                                </TextBlock>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Reading the font…"
+                           Margin="0,12,0,0"
+                           Foreground="{StaticResource MutedText}"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibility}}" />
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

@@ -40,6 +40,10 @@ internal sealed unsafe class FontEngineContext
     public FontInfo ReadInfo(LoadedFace face)
         => MetadataReader.ReadInfo(_library, face, face.Format);
 
+    /// <summary>Reads one glyph's measurements in design units.</summary>
+    public static GlyphDetail ReadGlyphDetail(LoadedFace face, uint glyphIndex, int codepoint)
+        => MetadataReader.ReadGlyphDetail(face, glyphIndex, codepoint);
+
     /// <summary>
     /// Returns an open face for <paramref name="key"/>, from the cache when possible and
     /// by reading the file when not.

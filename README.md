@@ -4,12 +4,12 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 5 complete.** Open a font and the whole folder loads beside it. A
+> **Status: Phase 6 complete.** Open a font and the whole folder loads beside it. A
 > switch in the header moves between **Single font** — one font large, cycled with
 > `Ctrl+Down` — and **Gallery**, every font in the folder drawn in its own face at your
 > choice of four sizes, tested at 1,361 rows. Star a font with `Ctrl+D` and it is copied
 > into `Favorite Fonts` beside the app. Every format v1.0 promises opens except
-> `.dfont`. Still to come: the glyph map and the Info panel. See
+> `.dfont`. Still to come: search, the subfolder toggle and settings that persist. See
 > [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ---
@@ -26,7 +26,8 @@ and run it.
 - **Favorites.** Star a font and the file is *copied* into a `Favorite Fonts`
   folder next to the exe. Un-starring sends that copy to the Recycle Bin.
 - **Custom preview text,** a 6–288 pt size slider and a waterfall of sizes.
-- **Glyph / character map** with click-to-copy, virtualized for 60,000-glyph CJK fonts.
+- **Glyph map** with click-to-copy, a jump box, and a details overlay; virtualized
+  and tested on a 30,000-glyph CJK font.
 - **Font info panel** — family, style, version, designer, license, embedding
   permissions, glyph count, variable-font axes, SHA-256.
 - **Search and filter** by name, with an optional subfolder scan.
@@ -66,7 +67,7 @@ companion files, not fonts. Not supported in v1.0: `.eot`, SVG fonts, BMFont
 | Focus search (`Esc` clears) | `Ctrl+F` |
 | Single font view — Preview | `Ctrl+1` |
 | Gallery view | `Ctrl+2` |
-| Single font view — Glyphs, Info | `Ctrl+3`, `Ctrl+4` (Phase 6) |
+| Single font view — Glyphs, Info | `Ctrl+3`, `Ctrl+4` |
 | Flip between the two views | `Ctrl+Tab` |
 | Bigger / smaller preview | `Ctrl+=` / `Ctrl+-`, or `Ctrl` + mouse wheel |
 | Rescan folder | `F5` |
@@ -198,8 +199,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 3 | Folder browsing and Preview tab | **Done** |
 | 4 | All Fonts gallery (virtualized, 1,000+ fonts) | **Done** |
 | 5 | Favorites (copy, Recycle Bin, hash matching) | **Done** |
-| 6 | Glyphs and Info panels | Next |
-| 7 | Search, subfolders, settings persistence, polish | Not started |
+| 6 | Glyphs and Info panels | **Done** |
+| 7 | Search, subfolders, settings persistence, polish | Next |
 | 8 | Hardening against the stress list | Not started |
 | 9 | Release: README, changelog, zip, size and cold-start report | Not started |
 

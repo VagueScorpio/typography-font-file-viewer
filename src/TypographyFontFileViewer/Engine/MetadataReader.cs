@@ -200,6 +200,56 @@ internal static unsafe class MetadataReader
         return entries;
     }
 
+    /// <summary>
+    /// Reads one glyph's measurements, in the font's own design units.
+    /// </summary>
+    /// <remarks>
+    /// Loaded unscaled on purpose: these numbers describe the glyph itself rather than
+    /// how it happens to be drawn at the moment, so they do not change as the user moves
+    /// the size slider.
+    /// </remarks>
+    public static GlyphDetail ReadGlyphDetail(LoadedFace face, uint glyphIndex, int codepoint)
+    {
+        ArgumentNullException.ThrowIfNull(face);
+
+        FT_FaceRec_* ftFace = face.Face;
+        var detail = new GlyphDetail
+        {
+            GlyphIndex = glyphIndex,
+            Codepoint = codepoint,
+            Name = GetGlyphName(face, glyphIndex),
+            UnitsPerEm = ftFace->units_per_EM,
+            IsBlank = true,
+        };
+
+        // A bitmap-only font has no outline to measure, so unscaled loading is refused;
+        // fall back to the scaled metrics, which is all such a font has.
+        FT_LOAD flags = face.IsScalable
+            ? FT_LOAD.FT_LOAD_NO_SCALE | FT_LOAD.FT_LOAD_NO_HINTING
+            : FT_LOAD.FT_LOAD_DEFAULT;
+
+        if (FT_Load_Glyph(ftFace, glyphIndex, flags) != FT_Error.FT_Err_Ok)
+            return detail;
+
+        FT_Glyph_Metrics_ metrics = ftFace->glyph->metrics;
+
+        int width = (int)(long)metrics.width;
+        int height = (int)(long)metrics.height;
+        int bearingX = (int)(long)metrics.horiBearingX;
+        int bearingY = (int)(long)metrics.horiBearingY;
+
+        return detail with
+        {
+            AdvanceWidth = (int)(long)metrics.horiAdvance,
+            LeftSideBearing = bearingX,
+            MinX = bearingX,
+            MaxX = bearingX + width,
+            MinY = bearingY - height,
+            MaxY = bearingY,
+            IsBlank = width == 0 || height == 0,
+        };
+    }
+
     /// <summary>The font's own name for a glyph, when it carries names at all.</summary>
     public static string? GetGlyphName(LoadedFace face, uint glyphIndex)
     {

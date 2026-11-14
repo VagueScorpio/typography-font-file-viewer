@@ -1,0 +1,232 @@
+<UserControl x:Class="TypographyFontFileViewer.Views.GlyphMapView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:TypographyFontFileViewer.Controls"
+             xmlns:vm="clr-namespace:TypographyFontFileViewer.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance Type=vm:GlyphMapViewModel}"
+             mc:Ignorable="d"
+             x:Name="Root">
+
+    <DockPanel>
+
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource PanelBackground}"
+                BorderBrush="{StaticResource PanelBorder}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Cell" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <Slider Width="140"
+                        Minimum="32" Maximum="128"
+                        IsSnapToTickEnabled="True" TickFrequency="4"
+                        VerticalAlignment="Center"
+                        Value="{Binding CellSize, Mode=TwoWay}" />
+                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center"
+                           MinWidth="44"
+                           Foreground="{StaticResource MutedText}"
+                           Text="{Binding CellSize, StringFormat={}{0} px}" />
+
+                <CheckBox Content="Show unmapped glyphs"
+                          Margin="16,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="Glyphs no character reaches — alternates, small caps and the like"
+                          IsChecked="{Binding ShowUnmapped, Mode=TwoWay}" />
+
+                <TextBlock Text="Jump to" Margin="18,0,6,0" VerticalAlignment="Center" />
+                <TextBox x:Name="JumpBox"
+                         Width="90"
+                         VerticalAlignment="Center"
+                         KeyDown="OnJumpKeyDown"
+                         ToolTip="U+00E9, e9, or paste the character itself"
+                         Text="{Binding JumpTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Content="Go" Margin="4,0,0,0" Padding="8,2"
+                        VerticalAlignment="Center"
+                        Click="OnJumpClick" />
+
+                <TextBlock Margin="18,0,0,0" VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedText}"
+                           Text="{Binding Status}" />
+            </StackPanel>
+        </Border>
+
+        <Grid Background="{Binding Background}">
+
+            <!-- Rows of cells: WPF virtualizes a stack and does not virtualize a wrap,
+                 so the grid is built as rows and only the visible ones exist. -->
+            <ListBox x:Name="RowList"
+                     ItemsSource="{Binding Rows}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Focusable="True"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     SizeChanged="OnGridSizeChanged"
+                     PreviewMouseWheel="OnGridMouseWheel"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel"
+                     VirtualizingPanel.CacheLength="1"
+                     VirtualizingPanel.CacheLengthUnit="Page">
+
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <!-- A row is not a selectable thing; the cells inside it are. -->
+                        <Setter Property="Focusable" Value="False" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:GlyphRowViewModel}">
+                        <ItemsControl ItemsSource="{Binding Cells}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="4"
+                                            Padding="2"
+                                            BorderBrush="#33808080"
+                                            BorderThickness="1"
+                                            CornerRadius="3"
+                                            Background="Transparent"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="OnCellClick"
+                                            MouseRightButtonUp="OnCellRightClick"
+                                            Width="{Binding DataContext.CellSize, ElementName=Root}"
+                                            Height="{Binding DataContext.CellSize, ElementName=Root}">
+                                        <Border.ToolTip>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding GlyphIndex, StringFormat=glyph index {0}}" />
+                                                <TextBlock Text="{Binding Name}"
+                                                           Visibility="{Binding Name, Converter={StaticResource NullToVisibility}}" />
+                                                <TextBlock Text="Click to copy · double-click for details"
+                                                           Margin="0,4,0,0"
+                                                           FontSize="10"
+                                                           Foreground="{StaticResource MutedText}" />
+                                            </StackPanel>
+                                        </Border.ToolTip>
+
+                                        <Grid>
+                                            <controls:GlyphCellImage
+                                                Glyph="{Binding}"
+                                                Map="{Binding DataContext, ElementName=Root}"
+                                                Epoch="{Binding DataContext.Epoch, ElementName=Root}" />
+
+                                            <TextBlock Text="{Binding Label}"
+                                                       FontSize="8"
+                                                       Opacity="0.55"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Bottom"
+                                                       Foreground="{StaticResource MutedText}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <TextBlock Text="Reading glyphs…"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{StaticResource MutedText}"
+                       Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibility}}" />
+
+            <!-- The detail overlay, opened by double-clicking a cell. -->
+            <Border Background="#C0000000"
+                    Visibility="{Binding IsDetailOpen, Converter={StaticResource BooleanToVisibility}}"
+                    MouseLeftButtonUp="OnOverlayBackgroundClick">
+                <Border Background="White"
+                        CornerRadius="6"
+                        Padding="20"
+                        MaxWidth="420"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="{Binding Detail.CodepointLabel}"
+                                   FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Detail.Name}"
+                                   Foreground="{StaticResource MutedText}"
+                                   Visibility="{Binding Detail.Name, Converter={StaticResource NullToVisibility}}" />
+
+                        <Border Margin="0,12"
+                                Padding="8"
+                                Background="{Binding Background}"
+                                BorderBrush="{StaticResource PanelBorder}"
+                                BorderThickness="1"
+                                HorizontalAlignment="Center">
+                            <Image Source="{Binding DetailImage}" Stretch="None" />
+                        </Border>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Glyph index" Margin="0,2,16,2"
+                                       Foreground="{StaticResource MutedText}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Detail.GlyphIndex}" Margin="0,2" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Advance" Margin="0,2,16,2"
+                                       Foreground="{StaticResource MutedText}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,2">
+                                <Run Text="{Binding Detail.AdvanceWidth, Mode=OneWay}" />
+                                <Run Text="of" Foreground="{StaticResource MutedText}" />
+                                <Run Text="{Binding Detail.UnitsPerEm, Mode=OneWay}" />
+                                <Run Text="units per em" Foreground="{StaticResource MutedText}" />
+                            </TextBlock>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Bounding box" Margin="0,2,16,2"
+                                       Foreground="{StaticResource MutedText}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,2">
+                                <Run Text="{Binding Detail.MinX, Mode=OneWay}" />,
+                                <Run Text="{Binding Detail.MinY, Mode=OneWay}" />
+                                <Run Text="to" Foreground="{StaticResource MutedText}" />
+                                <Run Text="{Binding Detail.MaxX, Mode=OneWay}" />,
+                                <Run Text="{Binding Detail.MaxY, Mode=OneWay}" />
+                            </TextBlock>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Size" Margin="0,2,16,2"
+                                       Foreground="{StaticResource MutedText}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,2">
+                                <Run Text="{Binding Detail.Width, Mode=OneWay}" />
+                                <Run Text="×" />
+                                <Run Text="{Binding Detail.Height, Mode=OneWay}" />
+                            </TextBlock>
+                        </Grid>
+
+                        <Button Content="Close"
+                                Margin="0,16,0,0"
+                                Padding="14,4"
+                                HorizontalAlignment="Right"
+                                Command="{Binding CloseDetailCommand}" />
+                    </StackPanel>
+                </Border>
+            </Border>
+        </Grid>
+
+    </DockPanel>
+</UserControl>

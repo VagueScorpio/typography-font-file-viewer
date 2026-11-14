@@ -183,18 +183,17 @@ public class ViewSwitchingTests : IDisposable
     }
 
     /// <summary>
-    /// Ctrl+3 and Ctrl+4 name panels that Phase 6 has not built yet.
+    /// Ctrl+1, Ctrl+3 and Ctrl+4 reach all three panels, from either view.
     /// </summary>
     /// <remarks>
-    /// They still switch to the single-font view, because that is half of what the user
-    /// asked for, and settle on Preview rather than selecting a panel that is not on the
-    /// strip. When Phase 6 adds the other two, raising AvailablePanelCount is all that
-    /// changes here.
+    /// The numbers run 1 to 4 across the whole window, as they did when these were four
+    /// flat tabs: 2 is the gallery, and the rest are panels of the single-font view.
     /// </remarks>
     [Theory]
-    [InlineData("Glyphs")]
-    [InlineData("Info")]
-    public void APanelThatDoesNotExistYet_FallsBackToPreview(string panel)
+    [InlineData("Preview", SingleFontPanel.Preview)]
+    [InlineData("Glyphs", SingleFontPanel.Glyphs)]
+    [InlineData("Info", SingleFontPanel.Info)]
+    public void EveryPanel_CanBeReachedFromTheGallery(string panel, SingleFontPanel expected)
     {
         using var service = new RenderService();
         using var model = new MainViewModel(service);
@@ -203,7 +202,28 @@ public class ViewSwitchingTests : IDisposable
         model.ShowPanelCommand.Execute(panel);
 
         Assert.Equal(ViewMode.SingleFont, model.CurrentView);
-        Assert.Equal(SingleFontPanel.Preview, model.CurrentPanel);
+        Assert.Equal(expected, model.CurrentPanel);
+    }
+
+    /// <summary>
+    /// A panel beyond the end of the strip settles on Preview rather than on nothing.
+    /// </summary>
+    /// <remarks>
+    /// All three are built now, so this cannot be reached through the UI. It stays
+    /// because the guard is what kept Ctrl+3 sensible while Glyphs was still unwritten,
+    /// and the same would be true of a fourth panel added later.
+    /// </remarks>
+    [Fact]
+    public void APanelPastTheEndOfTheStrip_FallsBackToPreview()
+    {
+        using var service = new RenderService();
+        using var model = new MainViewModel(service);
+
+        var converter = new EnumToIndexConverter();
+
+        Assert.Equal(SingleFontPanel.Preview,
+            converter.ConvertBack(MainViewModel.AvailablePanelCount + 5,
+                typeof(SingleFontPanel), null, CultureInfo.InvariantCulture));
     }
 
     [Fact]

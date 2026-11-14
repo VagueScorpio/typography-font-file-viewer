@@ -36,6 +36,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _favorites = favorites;
         Preview = new PreviewViewModel(renderService);
         Gallery = new GalleryViewModel(renderService, Preview);
+        GlyphMap = new GlyphMapViewModel(renderService, Preview);
+        Info = new InfoViewModel(renderService, new HashService());
 
         if (_favorites is not null)
             _favorites.Changed += (_, _) => _ = RefreshFavoriteFlagsAsync();
@@ -44,6 +46,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public PreviewViewModel Preview { get; }
 
     public GalleryViewModel Gallery { get; }
+
+    public GlyphMapViewModel GlyphMap { get; }
+
+    public InfoViewModel Info { get; }
 
     public ObservableRangeCollection<FontItemViewModel> Fonts { get; } = [];
 
@@ -84,7 +90,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>
     /// How many panels the strip actually offers. Glyphs and Info arrive in Phase 6.
     /// </summary>
-    public const int AvailablePanelCount = 1;
+    public const int AvailablePanelCount = 3;
 
     [RelayCommand]
     private void ShowView(string? mode)
@@ -196,8 +202,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         FontItemViewModel? selected = SelectedFont;
 
-        Preview.Face = selected is null || selected.IsBroken ? null : selected.Key;
+        FaceKey? face = selected is null || selected.IsBroken ? null : selected.Key;
+
+        Preview.Face = face;
         Preview.ErrorMessage = selected?.Error;
+
+        // All three panels describe the same font, which is the whole reason they live
+        // inside one view.
+        GlyphMap.Face = face;
+        Info.Face = face;
 
         if (selected is not null && !selected.IsBroken) _ = LoadFixedSizesAsync(selected);
         else Preview.FixedSizes = [];
@@ -680,6 +693,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _disposed = true;
 
         CancelMetadataScan();
+        GlyphMap.Dispose();
         Gallery.Dispose();
         Preview.Dispose();
     }

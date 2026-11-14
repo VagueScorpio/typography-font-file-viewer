@@ -22,5 +22,13 @@
             <views:PreviewView DataContext="{Binding Preview}" />
         </TabItem>
 
+        <TabItem Header="Glyphs">
+            <views:GlyphMapView DataContext="{Binding GlyphMap}" />
+        </TabItem>
+
+        <TabItem Header="Info">
+            <views:InfoView DataContext="{Binding Info}" />
+        </TabItem>
+
     </TabControl>
 </UserControl>
