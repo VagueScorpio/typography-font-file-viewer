@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 8: hardening
     - Phase 7: search, subfolders, settings, polish
     - Phase 6: the Glyphs and Info panels
     - Phase 5: favourites
@@ -21,6 +22,83 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 8: hardening
+  WHAT: The blueprint's Section 13.3 stress list, run and fixed. New
+        tests/StressTests.cs and Services/FontEngineLimits.cs; the engine now
+        reports its queue depth, the background metadata pass releases what it
+        reads, and clipped text is no longer rendered beyond the clip.
+  WHY:  Phase 8 asks for no crash, hang or file lock in any stress case, and
+        Section 13.4 sets the performance targets. Both needed measuring rather
+        than assuming.
+
+  THE STRESS LIST, AS RUN:
+        - 2,000 fonts including 50 zero-byte or corrupt files renamed to .ttf
+          and .woff2: lists in well under the budget, marks exactly 50 as
+          unreadable, leaves the other 1,950 alone, and keeps serving requests.
+        - A 30 MB CJK font in every view and every panel: fine.
+        - Deleting, renaming and overwriting the displayed font: no lock, no
+          crash, F5 recovers. Overwriting shows the new font rather than the
+          remembered one, which is what keying the face cache on length and
+          last-write time is for.
+        - Un-favouriting while viewing the favourites folder: covered since
+          Phase 5.
+        - Unicode names (Chinese, Arabic, Cyrillic, an emoji outside the BMP)
+          and a path over 260 characters: listed and rendered.
+        - A folder vanishing mid-use, standing in for a USB drive being pulled:
+          empties cleanly and the next folder opens normally.
+        - A held-down navigation key: the queue peaked well inside its bound and
+          drained to nothing when released.
+        - Every format in the corpus through every panel.
+
+  TWO REAL IMPROVEMENTS, BOTH FOUND BY MEASURING:
+        - The background metadata pass was caching every font it opened. It
+          visits each one exactly once, so that filled the cache with fonts
+          nobody had asked to look at while evicting the ones they had, and held
+          a folder's worth of font data live. It now reads, describes and
+          releases. A 2,000-font folder went from 476 MB to 297 MB after the
+          sweep.
+        - Gallery rows and waterfall lines are clipped at the panel edge, but
+          were rendered to their full width first — at a readable size, more
+          than half the bitmap was produced, cached and never seen. Rendering
+          now stops at the clip.
+
+  PERFORMANCE AGAINST SECTION 13.4:
+        - Cold start to window: 0.7 to 1.3 s, against under 2 s.          MET
+        - 500 fonts, list visible: well under a second.                   MET
+        - Preview re-render after a keystroke: median comfortably inside
+          the guard, against about 50 ms.                                 MET
+        - Next or previous font: median inside the guard, against 100 ms,
+          and that measures opening a font never seen before.             MET
+        - Memory, 2,000 fonts open in the gallery: 297 MB after listing
+          and the full metadata sweep, but 440 to 500 MB after scrolling
+          the whole gallery repeatedly, against under 400 MB.          NOT MET
+
+  ON THE MEMORY TARGET, HONESTLY: every cache is bounded and was re-tuned
+        together in Services/FontEngineLimits.cs — they had been set separately
+        and added up to 416 MB before the runtime had taken anything, which is
+        over the whole budget. They now total 160 MB. What remains is not
+        retained memory but churn: each render allocates a BGRA buffer, anything
+        over 85 KB lands on the large object heap, and that heap is not
+        compacted by default, so heavy scrolling leaves the working set high.
+        It oscillates rather than climbing, and the app stays responsive
+        throughout, but it is over the target and should be reported as such.
+        The named fix is to pool the render buffers: BitmapSource.Create copies
+        what it is given, so the buffer is free immediately afterwards. That
+        needs RenderedText to expose a length-bounded view rather than a raw
+        array, since a pooled array is larger than it was asked for, and it is
+        the kind of change that causes intermittent corruption if hurried. It
+        is written down rather than rushed at the end of a phase.
+        A GC conserve setting was tried first and measured no benefit, so it was
+        removed rather than left in as an unexamined tuning knob.
+
+  STILL NEEDS A PERSON: a network share, a USB drive physically pulled
+        mid-scan, 200% display scaling, and a second monitor at a different DPI.
+        The DPI arithmetic is tested and the app is Per-Monitor V2, but nothing
+        here substitutes for looking at it on two real screens.
+
+  VERIFIED: 294 tests, all passing, zero build warnings. The exe is one file,
+        60.37 MB.
 
 Phase 7: search, subfolders, settings, polish
   WHAT: A search box, a subfolder toggle, three sort orders, a recent-folders

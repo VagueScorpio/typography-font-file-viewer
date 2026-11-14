@@ -66,6 +66,7 @@
                  SelectionChanged="OnSelectionChanged"
                  MouseDoubleClick="OnRowDoubleClick"
                  PreviewMouseWheel="OnGalleryMouseWheel"
+                 SizeChanged="OnGallerySizeChanged"
                  Background="{Binding Gallery.Background}"
                  BorderThickness="0"
                  HorizontalContentAlignment="Stretch"

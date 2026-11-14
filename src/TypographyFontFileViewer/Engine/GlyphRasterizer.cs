@@ -25,13 +25,25 @@ internal static unsafe class GlyphRasterizer
     /// <param name="face">The face the text was laid out through, at the right size.</param>
     /// <param name="layout">Glyph positions from <see cref="TextLayout"/>.</param>
     /// <param name="style">Text and background colours.</param>
+    /// <param name="clipWidthPx">
+    /// Stop at this many pixels, for text the UI clips rather than wraps. Zero renders
+    /// the whole line.
+    /// </param>
+    /// <remarks>
+    /// The clip matters more than it looks. A gallery row or a waterfall line is cut off
+    /// at the panel edge, so rendering the rest of a pangram produces pixels that are
+    /// allocated, cached and then never seen — at a readable size that is easily more
+    /// than half the bitmap.
+    /// </remarks>
     public static RenderedText Render(
-        FT_LibraryRec_* library, LoadedFace face, LaidOutText layout, RenderStyle style)
+        FT_LibraryRec_* library, LoadedFace face, LaidOutText layout, RenderStyle style,
+        int clipWidthPx = 0)
     {
         ArgumentNullException.ThrowIfNull(face);
         ArgumentNullException.ThrowIfNull(layout);
 
         int padding = Math.Max(2, face.CurrentPixelSize / 8);
+        bool clipping = clipWidthPx > 0;
 
         // Pass 1: rasterize every glyph and find where the ink actually falls.
         var bitmaps = new List<(GlyphBitmap Bitmap, int X, int Y)>(layout.Glyphs.Count);
@@ -40,6 +52,9 @@ internal static unsafe class GlyphRasterizer
 
         foreach (PositionedGlyph glyph in layout.Glyphs)
         {
+            // Past the clip: not rasterized at all, which is where the saving is.
+            if (clipping && TextLayout.Round26(glyph.PenX26) >= clipWidthPx) continue;
+
             GlyphBitmap? rendered = RenderGlyph(library, face, glyph.GlyphIndex);
             if (rendered is not { } bitmap) continue;
 
@@ -68,8 +83,12 @@ internal static unsafe class GlyphRasterizer
             boxBottom = Math.Max(boxBottom, inkBottom);
         }
 
+        if (clipping) boxRight = Math.Min(boxRight, clipWidthPx);
+
         int width = Math.Max(1, boxRight - boxLeft) + 2 * padding;
         int height = Math.Max(1, boxBottom - boxTop) + 2 * padding;
+
+        if (clipping) width = Math.Min(width, clipWidthPx);
 
         // Keep a runaway font from asking for a gigabyte of canvas.
         const int MaximumDimension = 16384;

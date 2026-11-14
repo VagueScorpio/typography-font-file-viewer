@@ -28,7 +28,9 @@ internal sealed class FaceCache : IDisposable
     private long _bytes;
     private bool _disposed;
 
-    public FaceCache(int maximumFaces = 64, long maximumBytes = 256L * 1024 * 1024)
+    public FaceCache(
+        int maximumFaces = Services.FontEngineLimits.FaceCacheCount,
+        long maximumBytes = Services.FontEngineLimits.FaceCacheBytes)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumFaces, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 1);

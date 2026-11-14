@@ -521,8 +521,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task<int> LoadMetadataAsync(
         FontItemViewModel item, JobPriority priority, CancellationToken cancellationToken)
     {
+        // The sweep over the whole folder reads and releases; the selected font, read at
+        // high priority, is about to be rendered and is worth keeping open.
         FaceSummary[] summaries = await _renderService.ReadSummariesAsync(
-            item.File.Path, priority, cancellationToken);
+            item.File.Path, priority, cancellationToken,
+            keepOpen: priority == JobPriority.High);
 
         if (summaries.Length == 0 || cancellationToken.IsCancellationRequested) return 0;
 

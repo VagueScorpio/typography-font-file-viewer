@@ -224,8 +224,8 @@ public class GlyphMapViewModelTests
             foreach (GlyphEntry glyph in map.Rows.SelectMany(row => row.Cells).Take(1200))
                 await map.RenderCellAsync(glyph, TestCancellation);
 
-            Assert.True(map.Cache.Count <= 4000);
-            Assert.True(map.Cache.Bytes <= 64L * 1024 * 1024,
+            Assert.True(map.Cache.Count <= FontEngineLimits.GlyphCellCount);
+            Assert.True(map.Cache.Bytes <= FontEngineLimits.GlyphCellBytes,
                 $"cache held {map.Cache.Bytes / (1024 * 1024)} MB");
         }
     }

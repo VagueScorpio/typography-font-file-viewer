@@ -18,7 +18,9 @@ public sealed class RenderService : IDisposable
     private readonly FontEngine _engine;
     private bool _disposed;
 
-    public RenderService(int maximumCachedFaces = 64, long maximumCachedBytes = 256L * 1024 * 1024)
+    public RenderService(
+        int maximumCachedFaces = FontEngineLimits.FaceCacheCount,
+        long maximumCachedBytes = FontEngineLimits.FaceCacheBytes)
         => _engine = new FontEngine(maximumCachedFaces, maximumCachedBytes);
 
     /// <summary>Completes when the engine is up, or faults if FreeType would not start.</summary>
@@ -31,6 +33,12 @@ public sealed class RenderService : IDisposable
     public (int Count, long Bytes, int Hits, int Misses, int Evictions) CacheStatistics
         => _engine.CacheStatistics;
 
+    /// <summary>How many requests are queued but not yet run.</summary>
+    public int PendingJobCount => _engine.PendingJobCount;
+
+    /// <summary>How many queued requests were dropped because they had been superseded.</summary>
+    public int CancelledBeforeRunning => _engine.CancelledBeforeRunning;
+
     /// <summary>
     /// Reads one summary per face in a file. A collection yields several; a broken file
     /// yields a single summary carrying the error.
@@ -39,8 +47,14 @@ public sealed class RenderService : IDisposable
     /// This never throws for a bad font. The font list has to be able to show every file
     /// in a folder, including the ones that will not open.
     /// </remarks>
+    /// <param name="keepOpen">
+    /// Whether to leave the faces in the cache. False for the background pass over a
+    /// whole folder, which would otherwise evict everything the user is actually using
+    /// in order to remember fonts it has finished with.
+    /// </param>
     public Task<FaceSummary[]> ReadSummariesAsync(
-        string path, JobPriority priority = JobPriority.Low, CancellationToken cancellationToken = default)
+        string path, JobPriority priority = JobPriority.Low, CancellationToken cancellationToken = default,
+        bool keepOpen = true)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
@@ -63,7 +77,8 @@ public sealed class RenderService : IDisposable
                 for (int faceIndex = 0; faceIndex < faceCount; faceIndex++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    summaries[faceIndex] = ReadOneSummary(context, path, bytes, format, faceIndex, faceCount);
+                    summaries[faceIndex] = ReadOneSummary(
+                        context, path, bytes, format, faceIndex, faceCount, keepOpen);
                 }
 
                 return summaries;
@@ -81,12 +96,21 @@ public sealed class RenderService : IDisposable
 
     private static FaceSummary ReadOneSummary(
         FontEngineContext context, string path, byte[] bytes,
-        FontFormat format, int faceIndex, int faceCount)
+        FontFormat format, int faceIndex, int faceCount, bool keepOpen)
     {
         try
         {
             var key = FaceKey.For(path, faceIndex);
-            LoadedFace face = context.LoadFace(key, bytes, format);
+
+            if (keepOpen)
+            {
+                LoadedFace cached = context.LoadFace(key, bytes, format);
+                return MetadataReader.ReadSummary(cached, format) with { FaceCount = faceCount };
+            }
+
+            // Read it, describe it, let it go: the background pass visits every font in
+            // the folder once and should not displace what the user is looking at.
+            using LoadedFace face = context.LoadFaceUncached(key, bytes, format);
             return MetadataReader.ReadSummary(face, format) with { FaceCount = faceCount };
         }
         catch (Exception exception)
@@ -108,6 +132,10 @@ public sealed class RenderService : IDisposable
     /// <param name="pointSize">Size in points.</param>
     /// <param name="dpi">Pixels per inch of the monitor the window is on.</param>
     /// <param name="maxWidthPx">Wrap width in pixels; 0 or less to never wrap.</param>
+    /// <param name="clipWidthPx">
+    /// For text the UI clips rather than wraps: stop rasterizing past this width, so a
+    /// gallery row or waterfall line does not produce pixels nobody will see.
+    /// </param>
     public Task<RenderedText> RenderTextAsync(
         FaceKey key,
         string text,
@@ -116,7 +144,8 @@ public sealed class RenderService : IDisposable
         int maxWidthPx,
         RenderStyle style,
         JobPriority priority = JobPriority.High,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int clipWidthPx = 0)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(pointSize, 0);
@@ -133,7 +162,7 @@ public sealed class RenderService : IDisposable
             LaidOutText layout = TextLayout.Layout(face, text, maxWidthPx);
             cancellationToken.ThrowIfCancellationRequested();
 
-            return context.RenderText(face, layout, style);
+            return context.RenderText(face, layout, style, clipWidthPx);
         }, priority, cancellationToken);
     }
 

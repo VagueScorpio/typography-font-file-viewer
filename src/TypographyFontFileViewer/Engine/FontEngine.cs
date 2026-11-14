@@ -28,8 +28,9 @@ internal sealed unsafe class FontEngineContext
     public int ReadFaceCount(byte[] bytes) => LoadedFace.ReadFaceCount(_library, bytes);
 
     /// <summary>Rasterizes laid-out text into a BGRA buffer.</summary>
-    public RenderedText RenderText(LoadedFace face, LaidOutText layout, RenderStyle style)
-        => GlyphRasterizer.Render(_library, face, layout, style);
+    public RenderedText RenderText(
+        LoadedFace face, LaidOutText layout, RenderStyle style, int clipWidthPx = 0)
+        => GlyphRasterizer.Render(_library, face, layout, style, clipWidthPx);
 
     /// <summary>Rasterizes one glyph-map cell.</summary>
     public GlyphCellBitmap RenderCell(
@@ -72,6 +73,25 @@ internal sealed unsafe class FontEngineContext
         FontFormat format = SniffFormat(path, raw);
         return (FormatNormalizer.ToSfnt(raw, format, path), format);
     }
+    /// <summary>
+    /// Opens a face without putting it in the cache. The caller disposes it.
+    /// </summary>
+    /// <remarks>
+    /// For the background metadata pass, which opens every font in a folder exactly
+    /// once. Caching those fills the cache with fonts nobody has asked to look at,
+    /// evicting the ones they have, and holds a folder worth of font data live while
+    /// the pass runs. One font at a time is all it needs.
+    /// </remarks>
+    public LoadedFace LoadFaceUncached(FaceKey key, byte[] bytes, FontFormat format)
+    {
+        IReadOnlyList<string> companions = format == FontFormat.Type1
+            ? FindType1Companions(key.Path)
+            : [];
+
+        return LoadedFace.Load(_library, key, bytes, format, companions);
+    }
+
+
 
     /// <summary>
     /// Opens a face from SFNT bytes already in hand, adding it to the cache.
@@ -167,7 +187,9 @@ internal sealed unsafe class FontEngine : IDisposable
 
     private volatile bool _disposed;
 
-    public FontEngine(int maximumCachedFaces = 64, long maximumCachedBytes = 256L * 1024 * 1024)
+    public FontEngine(
+        int maximumCachedFaces = Services.FontEngineLimits.FaceCacheCount,
+        long maximumCachedBytes = Services.FontEngineLimits.FaceCacheBytes)
     {
         _maximumFaces = maximumCachedFaces;
         _maximumBytes = maximumCachedBytes;
@@ -188,6 +210,15 @@ internal sealed unsafe class FontEngine : IDisposable
 
     /// <summary>Cache statistics, for diagnostics.</summary>
     public (int Count, long Bytes, int Hits, int Misses, int Evictions) CacheStatistics { get; private set; }
+
+    /// <summary>
+    /// How many jobs are waiting. The blueprint's stress list requires this not to grow
+    /// without limit while a navigation key is held down.
+    /// </summary>
+    public int PendingJobCount => _highPriority.Count + _lowPriority.Count;
+
+    /// <summary>How many queued jobs were dropped because nobody wanted them any more.</summary>
+    public int CancelledBeforeRunning { get; private set; }
 
     /// <summary>
     /// Queues <paramref name="work"/> and returns a task for its result.
@@ -278,7 +309,10 @@ internal sealed unsafe class FontEngine : IDisposable
 
             if (job.CancellationToken.IsCancellationRequested)
             {
+                // Abandoned before it reached the front. Dropping it costs nothing,
+                // which is what keeps a held-down navigation key affordable.
                 job.Cancel();
+                CancelledBeforeRunning++;
                 continue;
             }
 

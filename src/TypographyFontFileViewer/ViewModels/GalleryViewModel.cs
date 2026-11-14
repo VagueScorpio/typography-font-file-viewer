@@ -94,6 +94,17 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
     /// <summary>A uniform row height keeps the virtualized scrollbar honest.</summary>
     public double RowHeight => Math.Ceiling(GallerySize * 1.7) + 18;
 
+    /// <summary>
+    /// How wide a row can actually show, in device pixels. Set by the view.
+    /// </summary>
+    /// <remarks>
+    /// Rows are clipped at this edge, so rendering past it produces pixels that are
+    /// allocated, cached and never seen. A generous margin is added so a row does not
+    /// visibly end short of the panel.
+    /// </remarks>
+    [ObservableProperty]
+    public partial int RowWidthPx { get; set; } = 1200;
+
     public string Text => _preview.PreviewText;
 
     public bool DarkBackground => _preview.DarkBackground;
@@ -103,6 +114,8 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
     public System.Windows.Media.Brush Background => _preview.PreviewBackground;
 
     partial void OnGallerySizeChanged(double value) => Redraw();
+
+    partial void OnRowWidthPxChanged(int value) => Redraw();
 
     private void OnPreviewChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -146,7 +159,7 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
         double dpi = Dpi <= 0 ? 96 : Dpi;
         int pixelSize = RenderService.ToPixelSize(GallerySize, dpi);
 
-        var key = new GalleryRenderKey(face, Text, pixelSize, DarkBackground);
+        var key = new GalleryRenderKey(face, Text, pixelSize, DarkBackground, Math.Max(200, RowWidthPx));
 
         BitmapSource? cached = Cache.TryGet(key);
         if (cached is not null) return cached;
@@ -155,7 +168,8 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
             face, Text, GallerySize, dpi,
             maxWidthPx: 0,                       // one line, clipped by the row
             DarkBackground ? RenderStyle.Dark : RenderStyle.Light,
-            JobPriority.Low, cancellationToken);
+            JobPriority.Low, cancellationToken,
+            clipWidthPx: Math.Max(200, RowWidthPx));
 
         if (cancellationToken.IsCancellationRequested) return null;
         if (rendered.Width <= 0 || rendered.Height <= 0) return null;

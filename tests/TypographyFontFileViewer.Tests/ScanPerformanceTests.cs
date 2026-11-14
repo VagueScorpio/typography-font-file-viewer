@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using TypographyFontFileViewer.Core;
 using TypographyFontFileViewer.Services;
 using Xunit;
 
@@ -61,6 +62,72 @@ public class ScanPerformanceTests : IDisposable
         Assert.Equal(count, fonts.Count);
         Assert.True(timer.ElapsedMilliseconds < 3000,
             $"Scanning {count} fonts took {timer.ElapsedMilliseconds} ms; the target is under 1000.");
+    }
+
+    /// <summary>
+    /// The blueprint wants a preview re-rendered within about 50 ms of a keystroke.
+    /// </summary>
+    /// <remarks>
+    /// Measured after the face is open, which is the case that matters: the user is
+    /// typing into the preview box for a font already on screen.
+    /// </remarks>
+    [Fact]
+    public async Task RenderingAPreviewAfterAKeystroke_IsQuick()
+    {
+        string font = TestFonts.RequireSystemFont();
+
+        using var service = new RenderService();
+        var key = FaceKey.For(font, 0);
+
+        // Warm: open the face and let the first render pay for it.
+        await service.RenderTextAsync(key, "warm up", 36, 96, 800, RenderStyle.Light,
+            cancellationToken: TestCancellation);
+
+        var measurements = new List<long>();
+        string text = "The quick brown fox";
+
+        for (int i = 1; i <= text.Length; i++)
+        {
+            var timer = Stopwatch.StartNew();
+            await service.RenderTextAsync(key, text[..i], 36, 96, 800, RenderStyle.Light,
+                cancellationToken: TestCancellation);
+            timer.Stop();
+            measurements.Add(timer.ElapsedMilliseconds);
+        }
+
+        measurements.Sort();
+        long median = measurements[measurements.Count / 2];
+
+        // Several times the 50 ms target: this is a guard against an order-of-magnitude
+        // regression, not a benchmark.
+        Assert.True(median < 200, $"the median re-render took {median} ms");
+    }
+
+    [Fact]
+    public async Task MovingToTheNextFont_ShowsItQuickly()
+    {
+        int count = Seed(40);
+
+        using var service = new RenderService();
+        var timings = new List<long>();
+
+        for (int i = 0; i < count; i++)
+        {
+            var key = FaceKey.For(Path.Combine(_folder, $"Font{i:D4}.ttf"), 0);
+
+            var timer = Stopwatch.StartNew();
+            await service.RenderTextAsync(key, "Next font", 36, 96, 800, RenderStyle.Light,
+                cancellationToken: TestCancellation);
+            timer.Stop();
+
+            timings.Add(timer.ElapsedMilliseconds);
+        }
+
+        timings.Sort();
+        long median = timings[timings.Count / 2];
+
+        // Each step opens a font that has never been seen, which is the slow case.
+        Assert.True(median < 400, $"the median step to a new font took {median} ms");
     }
 
     [Fact]

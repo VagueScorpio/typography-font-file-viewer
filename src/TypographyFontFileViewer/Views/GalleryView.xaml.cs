@@ -36,6 +36,21 @@ public partial class GalleryView : UserControl
             GalleryList.ScrollIntoView(GalleryList.SelectedItem);
     }
 
+    /// <summary>Tells the view model how wide a row can show, so it renders no more.</summary>
+    private void OnGallerySizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!e.WidthChanged || DataContext is not ViewModels.MainViewModel model) return;
+
+        double dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerInchX;
+        if (dpi <= 0) dpi = 96;
+
+        double usable = GalleryList.ActualWidth
+                      - SystemParameters.VerticalScrollBarWidth
+                      - 28;   // the row's own margins
+
+        model.Gallery.RowWidthPx = (int)Math.Max(200, usable * dpi / 96.0);
+    }
+
     /// <summary>
     /// Double-clicking a font takes you to the Preview tab, where it is large.
     /// </summary>

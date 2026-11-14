@@ -207,7 +207,8 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
                 // each size stays one line and the ladder of sizes reads down the page.
                 RenderedText line = await _renderService.RenderTextAsync(
                     face.Value, text, row.PointSize, dpi, maxWidthPx: 0, style,
-                    JobPriority.Low, cancellationToken);
+                    JobPriority.Low, cancellationToken,
+                    clipWidthPx: width);
 
                 if (cancellationToken.IsCancellationRequested) return;
                 row.Image = ToBitmap(line, dpi);

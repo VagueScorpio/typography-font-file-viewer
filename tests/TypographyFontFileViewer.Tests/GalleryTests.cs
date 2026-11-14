@@ -22,7 +22,7 @@ public class RenderedBitmapCacheTests
 
     private static GalleryRenderKey Key(string path, int size = 28) => new(
         new FaceKey(path, 0, 1000, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)),
-        "sample", size, DarkBackground: false);
+        "sample", size, DarkBackground: false, ClipWidth: 1200);
 
     [Fact]
     public void AStoredBitmap_ComesBackAgain()
@@ -223,9 +223,9 @@ public class GalleryViewModelTests : IDisposable
         }
 
         // Bounded by its own limits, not by how many fonts were thrown at it.
-        Assert.True(gallery.Cache.Count <= 300,
+        Assert.True(gallery.Cache.Count <= FontEngineLimits.GalleryRowCount,
             $"cache held {gallery.Cache.Count} rows");
-        Assert.True(gallery.Cache.Bytes <= 96L * 1024 * 1024,
+        Assert.True(gallery.Cache.Bytes <= FontEngineLimits.GalleryRowBytes,
             $"cache held {gallery.Cache.Bytes / (1024 * 1024)} MB");
     }
 

@@ -4,12 +4,12 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 7 complete.** Open a font and the whole folder loads beside it. A
+> **Status: Phase 8 complete.** Open a font and the whole folder loads beside it. A
 > switch in the header moves between **Single font** — one font large, cycled with
 > `Ctrl+Down` — and **Gallery**, every font in the folder drawn in its own face at your
 > choice of four sizes, tested at 1,361 rows. Star a font with `Ctrl+D` and it is copied
 > into `Favorite Fonts` beside the app. Every format v1.0 promises opens except
-> `.dfont`. Still to come: the Phase 8 hardening pass and the v1.0 release. See
+> `.dfont`. Still to come: the v1.0 release. See
 > [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ---
@@ -202,8 +202,8 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 5 | Favorites (copy, Recycle Bin, hash matching) | **Done** |
 | 6 | Glyphs and Info panels | **Done** |
 | 7 | Search, subfolders, settings persistence, polish | **Done** |
-| 8 | Hardening against the stress list | Next |
-| 9 | Release: README, changelog, zip, size and cold-start report | Not started |
+| 8 | Hardening against the stress list | **Done** |
+| 9 | Release: README, changelog, zip, size and cold-start report | Next |
 
 ## Repository layout
 
