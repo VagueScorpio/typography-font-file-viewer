@@ -27,6 +27,8 @@
         <KeyBinding Key="Home" Modifiers="Control" Command="{Binding FirstFontCommand}" />
         <KeyBinding Key="End" Modifiers="Control" Command="{Binding LastFontCommand}" />
         <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
+        <KeyBinding Key="D" Modifiers="Control" Command="{Binding ToggleFavoriteCommand}" />
+        <KeyBinding Key="F" Modifiers="Control+Shift" Command="{Binding OpenFavoritesCommand}" />
         <!-- The numbers run 1 to 4 across the whole window, as they did when these were
              four flat tabs: 1, 3 and 4 are panels of the single-font view, 2 is the
              gallery. Ctrl+3 and Ctrl+4 fall back to Preview until Phase 6 builds them. -->
@@ -45,6 +47,11 @@
                           Command="{Binding OpenFileCommand}" />
                 <MenuItem Header="Open _Folder…" InputGestureText="Ctrl+Shift+O"
                           Command="{Binding OpenFolderCommand}" />
+                <Separator />
+                <MenuItem Header="Show _Favorites folder" InputGestureText="Ctrl+Shift+F"
+                          Command="{Binding OpenFavoritesCommand}" />
+                <MenuItem Header="Open Favorites folder in _Explorer"
+                          Command="{Binding OpenFavoritesInExplorerCommand}" />
                 <Separator />
                 <MenuItem Header="_Rescan folder" InputGestureText="F5"
                           Command="{Binding RescanCommand}" />
@@ -84,6 +91,15 @@
                 <Button Content="Open Folder…" Command="{Binding OpenFolderCommand}" Padding="8,2" />
                 <Separator />
                 <Button Content="Rescan" Command="{Binding RescanCommand}" Padding="8,2" />
+                <Separator />
+                <Button Command="{Binding OpenFavoritesCommand}"
+                        Padding="8,2"
+                        ToolTip="Show the Favorite Fonts folder beside the app. Ctrl+Shift+F">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#x2605;" Foreground="#FFE0A516" Margin="0,0,5,0" />
+                        <TextBlock Text="Favorites" />
+                    </StackPanel>
+                </Button>
             </ToolBar>
         </ToolBarTray>
 
@@ -143,13 +159,39 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding SelectedFont.DisplayName}"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Visibility="{Binding IsSingleFont, Converter={StaticResource BooleanToVisibility}}" />
+                        <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                    Visibility="{Binding IsSingleFont, Converter={StaticResource BooleanToVisibility}}">
+                            <TextBlock Text="{Binding SelectedFont.DisplayName}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+
+                            <!-- The star for the font on screen. -->
+                            <Button Command="{Binding ToggleFavoriteCommand}"
+                                    Margin="10,0,0,0"
+                                    Padding="6,0"
+                                    VerticalAlignment="Center"
+                                    BorderThickness="0"
+                                    Background="Transparent"
+                                    Cursor="Hand"
+                                    ToolTip="Copy this font to the Favorite Fonts folder. Ctrl+D">
+                                <TextBlock FontSize="16">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="&#x2606;" />
+                                            <Setter Property="Foreground" Value="{StaticResource MutedText}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedFont.IsFavorite}" Value="True">
+                                                    <Setter Property="Text" Value="&#x2605;" />
+                                                    <Setter Property="Foreground" Value="#FFE0A516" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Button>
+                        </StackPanel>
 
                         <TextBlock Grid.Column="0"
                                    Text="All fonts in this folder"

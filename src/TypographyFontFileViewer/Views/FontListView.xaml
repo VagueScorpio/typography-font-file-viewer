@@ -45,18 +45,43 @@
                 </Style>
             </ListBox.ItemContainerStyle>
 
+            <ListBox.ContextMenu>
+                <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
+                                           RelativeSource={RelativeSource Self}}">
+                    <MenuItem Header="Favourite / Un-favourite" InputGestureText="Ctrl+D"
+                              Command="{Binding ToggleFavoriteCommand}" />
+                    <Separator />
+                    <MenuItem Header="Open containing folder"
+                              Command="{Binding OpenContainingFolderCommand}" />
+                    <MenuItem Header="Copy file path"
+                              Command="{Binding CopyFilePathCommand}" />
+                    <MenuItem Header="Copy family name"
+                              Command="{Binding CopyFamilyNameCommand}" />
+                </ContextMenu>
+            </ListBox.ContextMenu>
+
             <ListBox.ItemTemplate>
                 <DataTemplate DataType="{x:Type vm:FontItemViewModel}">
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18" />
                             <ColumnDefinition Width="16" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- A file that would not open is marked, never hidden. -->
+                        <!-- The star: lit when a copy of this font is in the favourites
+                             folder. Clicking it toggles that copy directly. -->
                         <TextBlock Grid.Column="0"
+                                   Text="&#x2605;"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="#FFE0A516"
+                                   Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibility}}" />
+
+                        <!-- A file that would not open is marked, never hidden. -->
+                        <TextBlock Grid.Column="1"
                                    Text="&#xE7BA;"
                                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                    FontSize="12"
@@ -64,19 +89,19 @@
                                    VerticalAlignment="Center"
                                    Visibility="{Binding IsBroken, Converter={StaticResource BooleanToVisibility}}" />
 
-                        <TextBlock Grid.Column="1"
+                        <TextBlock Grid.Column="2"
                                    Text="{Binding DisplayName}"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center" />
 
-                        <TextBlock Grid.Column="2"
+                        <TextBlock Grid.Column="3"
                                    Text="{Binding FaceLabel}"
                                    Margin="6,0,0,0"
                                    FontSize="11"
                                    Foreground="{StaticResource MutedText}"
                                    VerticalAlignment="Center" />
 
-                        <Border Grid.Column="3"
+                        <Border Grid.Column="4"
                                 Margin="8,0,0,0"
                                 Padding="4,1"
                                 CornerRadius="3"

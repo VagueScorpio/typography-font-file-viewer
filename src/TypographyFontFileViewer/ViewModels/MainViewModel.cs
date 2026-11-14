@@ -24,11 +24,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _metadataScan;
     private bool _disposed;
 
-    public MainViewModel(RenderService renderService)
+    private readonly FavoritesService? _favorites;
+
+    /// <param name="favorites">
+    /// The favourites folder. Omitted in tests that are not about favourites, which is
+    /// why the star commands check before acting rather than assuming.
+    /// </param>
+    public MainViewModel(RenderService renderService, FavoritesService? favorites = null)
     {
         _renderService = renderService;
+        _favorites = favorites;
         Preview = new PreviewViewModel(renderService);
         Gallery = new GalleryViewModel(renderService, Preview);
+
+        if (_favorites is not null)
+            _favorites.Changed += (_, _) => _ = RefreshFavoriteFlagsAsync();
     }
 
     public PreviewViewModel Preview { get; }
@@ -131,6 +141,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (Fonts.Count == 0) return "No fonts here";
 
             string summary = Fonts.Count == 1 ? "1 font" : $"{Fonts.Count:N0} fonts";
+
+            int starred = Fonts.Count(font => font.IsFavorite);
+            if (starred > 0) summary += $" · {starred} ★";
+
             return BrokenCount > 0 ? $"{summary} · {BrokenCount} unreadable" : summary;
         }
     }
@@ -287,7 +301,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         Debug.WriteLine($"Listed {Fonts.Count} fonts in {timer.ElapsedMilliseconds} ms");
+
+        OnPropertyChanged(nameof(ViewingFavorites));
         StartMetadataScan();
+
+        // Stars are worked out alongside the metadata rather than before it, so the list
+        // appears at once and fills in from both directions.
+        await RefreshFavoriteFlagsAsync(cancellationToken);
     }
 
     /// <summary>
@@ -421,6 +441,193 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private Task Rescan() => RescanAsync();
+
+    // --- Favourites ------------------------------------------------------------
+
+    /// <summary>True when there is a favourites folder to work with.</summary>
+    public bool FavoritesAvailable => _favorites is not null;
+
+    /// <summary>How many fonts are in the favourites folder.</summary>
+    public int FavoriteCount => _favorites?.Count ?? 0;
+
+    /// <summary>True while the folder on screen is the favourites folder itself.</summary>
+    public bool ViewingFavorites
+        => _favorites is not null && _favorites.IsFavoritesFolder(CurrentFolder);
+
+    /// <summary>
+    /// Stars or un-stars the selected font.
+    /// </summary>
+    /// <remarks>
+    /// Un-starring while the favourites folder is the one on screen removes the row as
+    /// well, since the file it stood for has just gone to the Recycle Bin, and moves the
+    /// selection to the next font so the user is not left on nothing.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ToggleFavorite()
+    {
+        if (_favorites is null || SelectedFont is not { } font) return;
+
+        bool wasFavorite = font.IsFavorite;
+        bool viewingFavorites = ViewingFavorites;
+        int index = Fonts.IndexOf(font);
+
+        FavoriteResult result = await _favorites.ToggleAsync(font.File);
+
+        if (!result.Succeeded)
+        {
+            Message = result.Error;
+            return;
+        }
+
+        Message = null;
+
+        if (wasFavorite && viewingFavorites && index >= 0)
+        {
+            // The file is gone; so should the row be.
+            Fonts.RemoveAt(index);
+            SelectedFont = Fonts.Count == 0
+                ? null
+                : Fonts[Math.Min(index, Fonts.Count - 1)];
+
+            OnPropertyChanged(nameof(FolderSummary));
+            OnPropertyChanged(nameof(SelectedPosition));
+        }
+
+        await RefreshFavoriteFlagsAsync();
+    }
+
+    /// <summary>Opens the favourites folder as the current folder.</summary>
+    [RelayCommand]
+    private async Task OpenFavorites()
+    {
+        if (_favorites is null) return;
+
+        string? problem = _favorites.EnsureDirectoryWritable();
+        if (problem is not null)
+        {
+            Message = problem;
+            return;
+        }
+
+        await OpenPathAsync(_favorites.Directory);
+    }
+
+    /// <summary>Shows the favourites folder in Explorer.</summary>
+    [RelayCommand]
+    private void OpenFavoritesInExplorer()
+    {
+        if (_favorites is null) return;
+
+        string? problem = _favorites.EnsureDirectoryWritable();
+        if (problem is not null)
+        {
+            Message = problem;
+            return;
+        }
+
+        RevealInExplorer(_favorites.Directory);
+    }
+
+    /// <summary>Shows a font in Explorer with the file itself selected.</summary>
+    [RelayCommand]
+    private void OpenContainingFolder(FontItemViewModel? font)
+    {
+        FontItemViewModel? target = font ?? SelectedFont;
+        if (target is null) return;
+
+        RevealInExplorer(target.File.Path, select: true);
+    }
+
+    [RelayCommand]
+    private void CopyFilePath(FontItemViewModel? font)
+        => CopyToClipboard((font ?? SelectedFont)?.File.Path);
+
+    [RelayCommand]
+    private void CopyFamilyName(FontItemViewModel? font)
+    {
+        FontItemViewModel? target = font ?? SelectedFont;
+        CopyToClipboard(string.IsNullOrWhiteSpace(target?.Family)
+            ? target?.File.FileName
+            : target.Family);
+    }
+
+    private void CopyToClipboard(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException)
+        {
+            // Another process can hold the clipboard open; saying so beats a crash.
+            Message = $"The clipboard was busy: {exception.Message}";
+        }
+    }
+
+    private void RevealInExplorer(string path, bool select = false)
+    {
+        try
+        {
+            var start = new ProcessStartInfo("explorer.exe")
+            {
+                // Explorer wants its path quoted, and /select, has no space after it.
+                Arguments = select ? $"/select,\"{path}\"" : $"\"{path}\"",
+                UseShellExecute = true,
+            };
+
+            Process.Start(start);
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException)
+        {
+            Message = $"Could not open Explorer: {exception.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Works out which rows deserve a star.
+    /// </summary>
+    /// <remarks>
+    /// Inside the favourites folder every row is one by definition, which saves hashing
+    /// the whole folder to learn what it already knows. Anywhere else, each file's size
+    /// is checked against the index first and only a size that matches is ever hashed.
+    /// </remarks>
+    public async Task RefreshFavoriteFlagsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_favorites is null) return;
+
+        try
+        {
+            bool everythingIsFavorite = _favorites.IsFavoritesFolder(CurrentFolder);
+
+            // One answer per file, since a collection's faces share one file.
+            var byPath = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (FontItemViewModel font in Fonts.ToList())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!byPath.TryGetValue(font.File.Path, out bool starred))
+                {
+                    starred = everythingIsFavorite
+                           || await _favorites.IsFavoriteAsync(
+                                  font.File.Path, font.File.Length, cancellationToken);
+
+                    byPath[font.File.Path] = starred;
+                }
+
+                font.IsFavorite = starred;
+            }
+
+            OnPropertyChanged(nameof(FavoriteCount));
+            OnPropertyChanged(nameof(FolderSummary));
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer folder is being loaded; its own pass will set the stars.
+        }
+    }
 
     // --- Navigation ------------------------------------------------------------
 

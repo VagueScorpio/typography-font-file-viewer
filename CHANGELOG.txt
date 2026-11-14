@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 5: favourites
     - Blueprint v1.1: nested panels replace the four flat tabs
     - View switch: single font or gallery
     - Phase 4: the All Fonts gallery
@@ -18,6 +19,71 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 5: favourites
+  WHAT: Starring a font copies it into a "Favorite Fonts" folder beside the exe;
+        un-starring sends that copy to the Recycle Bin. New
+        Core/FavoriteEntry.cs, Services/HashService.cs,
+        Services/SettingsService.cs, Services/FileRecycler.cs and
+        Services/FavoritesService.cs, plus the star in the font list, the
+        single-font header and every gallery row, a right-click menu, Ctrl+D,
+        a Favorites button and two File-menu items.
+  WHY:  Requirements R4 and R5. A favourite that was only a bookmark would break
+        the moment the original moved or was deleted; a favourite that is a real
+        copy of the font is something you can open, install or send to someone.
+  HOW:  Identity is the SHA-256 of the file's contents, never its name — two
+        unrelated fonts are often both called Roboto.ttf, and the same font
+        renamed is still the same font. Checking a folder hashes almost nothing:
+        a file whose size matches no favourite is ruled out for free, and only a
+        size that matches is ever read. The files in the folder are the truth and
+        the index in the settings file is only the fast path, so startup
+        reconciles the two — a font dropped in by hand is picked up, an entry
+        whose file has gone is dropped.
+
+  CARE TAKEN, since this is the only code in the app that removes a file:
+        - Un-favouriting can only ever delete inside the favourites folder. The
+          check is explicit rather than implied, and tested on its own with
+          traversal paths, even though reconciling rebuilds the index from the
+          folder listing and so should never produce a name that could escape.
+        - The font the user favourited *from* is never touched; only the copy.
+        - Deletion goes to the Recycle Bin, because that copy may be the only one
+          left — favourited from a memory card, a cleared download, a folder
+          since tidied.
+        - The recycler sits behind an interface so the test suite does not fill
+          the developer's Recycle Bin on every run. One test exercises the real
+          one, so the path everyone else fakes is known to work.
+        - Copies go to a temporary name and are then moved into place, so an
+          interrupted copy never leaves a half-written font looking real.
+        - Settings are written the same way: a crash midway leaves the previous
+          file intact, and a file that will not parse is renamed to .bad rather
+          than deleted, because it is the user's data.
+        - A folder that cannot be written to says so plainly and names itself,
+          rather than quietly saving somewhere the user will never find.
+
+  DETAIL WORTH KNOWING:
+        - A different font wanting a name already taken becomes "Name (2).ext".
+        - A Type 1 font brings its .afm and .pfm metrics, renamed to match, or
+          FreeType would not find them beside their new font.
+        - Favouriting any face of a collection copies the whole file, so every
+          face in it shows the star.
+        - Opening the favourites folder itself stars every row by definition,
+          which saves hashing a folder to learn what it already knows.
+        - Un-starring while that folder is on screen removes the row as well and
+          moves the selection on, since the file it stood for has just gone.
+        - Settings keep fields they do not understand, so a file written by a
+          later version is not stripped by an earlier one.
+
+  VERIFIED: 229 tests, all passing, zero build warnings. End to end from the
+        published exe: Ctrl+D created "Favorite Fonts\Inter-Bold.ttf" and
+        TypographyFontFileViewer.json beside it; the star was still right after
+        a restart; Ctrl+D again removed the copy and emptied the index. Tests
+        cover hashing identity, name collisions, renamed duplicates, Type 1
+        companions, collections, reconcile after a manual add and a manual
+        delete, a recycler that refuses, an unwritable folder, and the
+        delete-safety guard.
+
+  NOT YET DONE: the favourites count in the sidebar header is live, but sort
+        order, search and the subfolder toggle are Phase 7.
 
 Blueprint v1.1: nested panels replace the four flat tabs
   WHAT: docs/Typography-Font-File-Viewer-Blueprint-v1.0.md is now

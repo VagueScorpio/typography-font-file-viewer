@@ -11,17 +11,35 @@ namespace TypographyFontFileViewer;
 public partial class MainWindow : Window
 {
     private readonly RenderService _renderService = new();
+    private readonly SettingsService _settings;
+    private readonly FavoritesService _favorites;
     private readonly MainViewModel _model;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        _model = new MainViewModel(_renderService)
+        // Everything the app keeps lives beside the exe. Environment.ProcessPath is the
+        // one that works in a single-file build; Assembly.Location is empty there.
+        string appFolder = Path.GetDirectoryName(Environment.ProcessPath)
+                        ?? AppContext.BaseDirectory;
+
+        _settings = new SettingsService(SettingsService.DefaultPathFor(appFolder));
+        _settings.Load();
+
+        _favorites = new FavoritesService(
+            FavoritesService.DefaultDirectoryFor(appFolder),
+            new HashService(),
+            new RecycleBinFileRecycler(),
+            _settings);
+
+        _model = new MainViewModel(_renderService, _favorites)
         {
             PickFontFile = PickFontFile,
             PickFolder = PickFolder,
         };
+
+        if (_settings.LastProblem is { Length: > 0 } problem) _model.Message = problem;
 
         DataContext = _model;
 
@@ -32,6 +50,10 @@ public partial class MainWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         UpdateDpi();
+
+        // The folder is the truth, so bring the index into line with it before anything
+        // asks which fonts are starred.
+        await _favorites.ReconcileAsync();
 
         // Double-clicking a font in Explorer starts the app with that file.
         if (App.StartupPath is { Length: > 0 } startup)

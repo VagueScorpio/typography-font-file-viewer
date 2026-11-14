@@ -45,6 +45,16 @@ public sealed partial class FontItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Tooltip))]
     public partial string? Error { get; set; }
 
+    /// <summary>
+    /// True when a copy of this exact font is in the favourites folder.
+    /// </summary>
+    /// <remarks>
+    /// Decided by the file's contents, not its name, so a renamed duplicate in another
+    /// folder shows the same star.
+    /// </remarks>
+    [ObservableProperty]
+    public partial bool IsFavorite { get; set; }
+
     /// <summary>False until the metadata pass has reached this row.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayName))]

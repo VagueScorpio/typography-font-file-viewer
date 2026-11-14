@@ -95,6 +95,11 @@
 
                         <!-- The small label: which file this is. -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="&#x2605;"
+                                       FontSize="11"
+                                       Margin="0,0,5,0"
+                                       Foreground="#FFE0A516"
+                                       Visibility="{Binding IsFavorite, Converter={StaticResource BooleanToVisibility}}" />
                             <TextBlock Text="{Binding File.FileName}"
                                        FontSize="10"
                                        Foreground="#FF9AA3AB" />
