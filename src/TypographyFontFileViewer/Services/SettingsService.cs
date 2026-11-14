@@ -15,6 +15,35 @@ namespace TypographyFontFileViewer.Services;
 /// </remarks>
 public sealed class AppSettings
 {
+    /// <summary>How many folders the File menu remembers.</summary>
+    public const int MaximumRecentFolders = 10;
+
+    // --- Window ---------------------------------------------------------------
+
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
+
+    // --- Where the user was ---------------------------------------------------
+
+    public string? LastFolder { get; set; }
+    public string? LastSelectedFile { get; set; }
+    public List<string> RecentFolders { get; set; } = [];
+
+    // --- How they had it set up -----------------------------------------------
+
+    public string? PreviewText { get; set; }
+    public double PreviewPointSize { get; set; } = 48;
+    public double GallerySize { get; set; } = 28;
+    public int GlyphCellSize { get; set; } = 64;
+    public bool IncludeSubfolders { get; set; }
+    public SortOrder SortOrder { get; set; } = SortOrder.FileName;
+    public bool DarkPreview { get; set; }
+    public ViewModels.ViewMode SelectedView { get; set; } = ViewModels.ViewMode.SingleFont;
+    public ViewModels.SingleFontPanel SelectedPanel { get; set; } = ViewModels.SingleFontPanel.Preview;
+
     /// <summary>The favourites index. The folder is the truth; this is the fast path.</summary>
     public List<FavoriteEntry> Favorites { get; set; } = [];
 
@@ -38,6 +67,10 @@ public sealed class SettingsService
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+
+        // Enums as names, so the file stays readable and a reordered enum does not
+        // silently change what someone's saved settings mean.
+        Converters = { new JsonStringEnumConverter() },
     };
 
     private readonly Lock _gate = new();

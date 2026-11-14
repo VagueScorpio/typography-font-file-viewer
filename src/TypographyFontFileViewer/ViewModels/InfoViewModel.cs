@@ -78,8 +78,11 @@ public sealed partial class InfoViewModel : ObservableObject
     {
         CancellationTokenSource request = new();
         CancellationTokenSource? previous = Interlocked.Exchange(ref _pending, request);
+        // Cancelled but not disposed: another thread may still be holding this token
+        // source, and disposing one out from under an in-flight request is how a
+        // superseded render turns into an ObjectDisposedException. It has nothing
+        // unmanaged to release, so letting the collector have it is enough.
         previous?.Cancel();
-        previous?.Dispose();
 
         CancellationToken cancellationToken = request.Token;
 

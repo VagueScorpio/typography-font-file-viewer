@@ -28,7 +28,7 @@
         </Border>
 
         <ListBox x:Name="FontList"
-                 ItemsSource="{Binding Fonts}"
+                 ItemsSource="{Binding VisibleFonts}"
                  SelectedItem="{Binding SelectedFont, Mode=TwoWay}"
                  SelectionChanged="OnSelectionChanged"
                  BorderThickness="0"

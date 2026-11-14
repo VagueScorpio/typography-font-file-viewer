@@ -45,19 +45,115 @@ public partial class MainWindow : Window
 
         Loaded += OnLoaded;
         DpiChanged += (_, _) => UpdateDpi();
+
+        // Closing the window is the usual way out, but it is not the only one: shutting
+        // Windows down with the app open should not lose what the user had set up.
+        if (Application.Current is { } application)
+            application.SessionEnding += (_, _) => SaveSettings();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         UpdateDpi();
+        RestoreWindowBounds();
+        _model.ApplySettings(_settings.Current);
 
         // The folder is the truth, so bring the index into line with it before anything
         // asks which fonts are starred.
         await _favorites.ReconcileAsync();
 
-        // Double-clicking a font in Explorer starts the app with that file.
+        // A file on the command line is what the user just asked for, so it wins over
+        // whatever they were looking at last time.
         if (App.StartupPath is { Length: > 0 } startup)
             await _model.OpenPathAsync(startup);
+        else
+            await _model.RestoreLastSessionAsync(_settings.Current);
+    }
+
+    /// <summary>
+    /// Puts the window back where it was, if that is still somewhere visible.
+    /// </summary>
+    /// <remarks>
+    /// A saved position can point at a monitor that has since been unplugged. Rather
+    /// than open off-screen, anything that no longer overlaps a screen falls back to
+    /// the default position.
+    /// </remarks>
+    private void RestoreWindowBounds()
+    {
+        AppSettings settings = _settings.Current;
+
+        if (settings.WindowWidth is not { } width || settings.WindowHeight is not { } height)
+            return;
+        if (width < MinWidth || height < MinHeight) return;
+
+        if (settings.WindowLeft is { } left && settings.WindowTop is { } top)
+        {
+            var proposed = new Rect(left, top, width, height);
+            if (IsOnScreen(proposed))
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = left;
+                Top = top;
+            }
+        }
+
+        Width = width;
+        Height = height;
+
+        if (settings.WindowMaximized) WindowState = WindowState.Maximized;
+    }
+
+    private static bool IsOnScreen(Rect window)
+    {
+        var desktop = new Rect(
+            SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+
+        Rect overlap = Rect.Intersect(window, desktop);
+
+        // Enough of it visible to grab hold of.
+        return overlap != Rect.Empty && overlap.Width >= 120 && overlap.Height >= 80;
+    }
+
+    /// <summary>Writes everything worth remembering back to the settings file.</summary>
+    private void SaveSettings()
+    {
+        AppSettings settings = _settings.Current;
+
+        // RestoreBounds is where the window would be if it were not maximized, which is
+        // what should come back when it is un-maximized next time.
+        Rect bounds = WindowState == WindowState.Normal
+            ? new Rect(Left, Top, Width, Height)
+            : RestoreBounds;
+
+        if (bounds.Width > 0 && bounds.Height > 0)
+        {
+            settings.WindowLeft = bounds.Left;
+            settings.WindowTop = bounds.Top;
+            settings.WindowWidth = bounds.Width;
+            settings.WindowHeight = bounds.Height;
+        }
+
+        settings.WindowMaximized = WindowState == WindowState.Maximized;
+
+        _model.CaptureSettings(settings);
+        _settings.Save();
+    }
+
+    /// <summary>Ctrl+F focuses the search box; Esc inside it clears and lets go.</summary>
+    private void OnSearchKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Escape) return;
+
+        _model.ClearSearchCommand.Execute(null);
+        System.Windows.Input.Keyboard.ClearFocus();
+        e.Handled = true;
+    }
+
+    private void OnFocusSearch(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+    {
+        SearchBox.Focus();
+        SearchBox.SelectAll();
     }
 
     /// <summary>
@@ -173,6 +269,13 @@ public partial class MainWindow : Window
             "About Typography Font File Viewer",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        // While the window still knows where it is.
+        SaveSettings();
+        base.OnClosing(e);
     }
 
     protected override void OnClosed(EventArgs e)

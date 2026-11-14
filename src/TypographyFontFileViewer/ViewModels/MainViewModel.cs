@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -41,6 +42,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         if (_favorites is not null)
             _favorites.Changed += (_, _) => _ = RefreshFavoriteFlagsAsync();
+
     }
 
     public PreviewViewModel Preview { get; }
@@ -52,6 +54,129 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public InfoViewModel Info { get; }
 
     public ObservableRangeCollection<FontItemViewModel> Fonts { get; } = [];
+
+    /// <summary>
+    /// The rows actually on screen: <see cref="Fonts"/> with the search applied.
+    /// </summary>
+    /// <remarks>
+    /// Both lists bind here, so filtering once filters the sidebar and the gallery
+    /// together — which is what the blueprint means by the gallery showing "the current
+    /// (filtered) list".
+    ///
+    /// Filtered here rather than through a WPF CollectionView on purpose. A collection
+    /// view belongs to the thread that made it, which would tie this view model to a
+    /// dispatcher and make every background continuation that touches the list a
+    /// thread-affinity bug waiting to happen.
+    /// </remarks>
+    public ObservableRangeCollection<FontItemViewModel> VisibleFonts { get; } = [];
+
+    /// <summary>What the user typed in the search box.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    public partial string SearchText { get; set; } = string.Empty;
+
+    public bool IsFiltered => !string.IsNullOrWhiteSpace(SearchText);
+
+    [ObservableProperty]
+    public partial bool IncludeSubfolders { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSortedByFileName))]
+    [NotifyPropertyChangedFor(nameof(IsSortedByFamily))]
+    [NotifyPropertyChangedFor(nameof(IsSortedByFormat))]
+    public partial SortOrder SortOrder { get; set; } = SortOrder.FileName;
+
+    /// <summary>The last folders opened, most recent first.</summary>
+    public ObservableRangeCollection<string> RecentFolders { get; } = [];
+
+    partial void OnSearchTextChanged(string value) => RefreshFilter();
+
+    partial void OnSortOrderChanged(SortOrder value) => ApplySort();
+
+    /// <summary>
+    /// Completes when the rescan triggered by the subfolder toggle has finished.
+    /// </summary>
+    /// <remarks>
+    /// Nothing in the UI waits on this; toggling the box rescans in the background as it
+    /// should. It exists so a test can tell "the wider scan has not finished" apart from
+    /// "the wider scan found nothing".
+    /// </remarks>
+    public Task PendingRescan { get; private set; } = Task.CompletedTask;
+
+    partial void OnIncludeSubfoldersChanged(bool value)
+    {
+        if (!string.IsNullOrEmpty(CurrentFolder)) PendingRescan = RescanAsync();
+    }
+
+    /// <summary>Re-applies the search filter and rebuilds the visible list.</summary>
+    public void RefreshFilter()
+    {
+        // Captured first: replacing the contents resets the bound lists, and a list
+        // clearing its own selection writes null straight back here before this method
+        // gets to look at it.
+        FontItemViewModel? wanted = SelectedFont;
+
+        VisibleFonts.ReplaceAll(Fonts.Where(Matches));
+
+        OnPropertyChanged(nameof(FolderSummary));
+        OnPropertyChanged(nameof(SelectedPosition));
+        OnPropertyChanged(nameof(StatusText));
+
+        // Keep the selection where it still shows; otherwise move to the first match, so
+        // a search always leaves something previewed rather than an empty panel.
+        SelectedFont = wanted is not null && VisibleFonts.Contains(wanted)
+            ? wanted
+            : VisibleFonts.Count > 0 ? VisibleFonts[0] : null;
+    }
+
+    private bool Matches(FontItemViewModel font)
+    {
+        if (string.IsNullOrWhiteSpace(SearchText)) return true;
+
+        string needle = SearchText.Trim();
+
+        // File name, family and style, which between them are what anyone would type.
+        return font.File.FileName.Contains(needle, StringComparison.OrdinalIgnoreCase)
+            || font.Family.Contains(needle, StringComparison.OrdinalIgnoreCase)
+            || font.Style.Contains(needle, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Re-orders the list.
+    /// </summary>
+    /// <remarks>
+    /// Sorting the underlying collection rather than the view, because family names
+    /// arrive from the background pass long after the rows do and a view's sort
+    /// descriptions would not notice them changing.
+    /// </remarks>
+    public void ApplySort()
+    {
+        if (Fonts.Count == 0) return;
+
+        FontItemViewModel? selected = SelectedFont;
+
+        IEnumerable<FontItemViewModel> ordered = SortOrder switch
+        {
+            SortOrder.FamilyName => Fonts
+                .OrderBy(font => font.Family, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(font => font.Style, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(font => font.File.FileName, NaturalFileNameComparer.Instance),
+
+            SortOrder.Format => Fonts
+                .OrderBy(font => font.FormatBadge, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(font => font.File.FileName, NaturalFileNameComparer.Instance),
+
+            _ => Fonts
+                .OrderBy(font => font.File.FileName, NaturalFileNameComparer.Instance)
+                .ThenBy(font => font.FaceIndex),
+        };
+
+        Fonts.ReplaceAll([.. ordered]);
+        RefreshFilter();
+
+        // ReplaceAll resets the collection, which clears the lists' selection.
+        if (selected is not null && Fonts.Contains(selected)) SelectedFont = selected;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
@@ -146,7 +271,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (IsScanning) return "Scanning…";
             if (Fonts.Count == 0) return "No fonts here";
 
-            string summary = Fonts.Count == 1 ? "1 font" : $"{Fonts.Count:N0} fonts";
+            // When a search is on, say how much of the folder is being hidden.
+            string summary = IsFiltered
+                ? $"{VisibleFonts.Count:N0} of {Fonts.Count:N0} fonts"
+                : Fonts.Count == 1 ? "1 font" : $"{Fonts.Count:N0} fonts";
 
             int starred = Fonts.Count(font => font.IsFavorite);
             if (starred > 0) summary += $" · {starred} ★";
@@ -160,10 +288,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (SelectedFont is null || Fonts.Count == 0) return string.Empty;
+            if (SelectedFont is null || VisibleFonts.Count == 0) return string.Empty;
 
-            int index = Fonts.IndexOf(SelectedFont);
-            return index < 0 ? string.Empty : $"Font {index + 1:N0} of {Fonts.Count:N0}";
+            int index = VisibleFonts.IndexOf(SelectedFont);
+            return index < 0 ? string.Empty : $"Font {index + 1:N0} of {VisibleFonts.Count:N0}";
         }
     }
 
@@ -282,15 +410,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             IReadOnlyList<FontFile> files = await _scanner.ScanAsync(
-                folder, includeSubfolders: false, cancellationToken);
+                folder, IncludeSubfolders, cancellationToken);
 
             BrokenCount = 0;
 
             // One notification, not one per font: a thousand incremental adds would be
             // a thousand layout passes in every list bound to this collection.
             Fonts.ReplaceAll(files.Select(file => new FontItemViewModel(file)));
+            RefreshFilter();
 
             CurrentFolder = folder;
+            RememberFolder(folder);
 
             SelectedFont = selectFile is not null
                 ? Fonts.FirstOrDefault(font =>
@@ -376,6 +506,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (!cancellationToken.IsCancellationRequested)
             {
                 BrokenCount = Fonts.Count(font => font.IsBroken);
+
+                // Family names only exist now, so a family sort could not run until now.
+                if (SortOrder != SortOrder.FileName) ApplySort();
+
+                RefreshFilter();
                 OnPropertyChanged(nameof(FolderSummary));
                 OnPropertyChanged(nameof(StatusText));
             }
@@ -410,6 +545,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Fonts.Insert(index + face, row);
         }
 
+        // The new faces have to reach the screen, which means through the filter.
+        RefreshFilter();
         OnPropertyChanged(nameof(SelectedPosition));
         OnPropertyChanged(nameof(StatusText));
         return summaries.Length - 1;
@@ -455,6 +592,112 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private Task Rescan() => RescanAsync();
 
+    // --- Recent folders, search, settings ---------------------------------------
+
+    /// <summary>Moves a folder to the top of the recent list, keeping the last ten.</summary>
+    private void RememberFolder(string folder)
+    {
+        var updated = new List<string>(AppSettings.MaximumRecentFolders) { folder };
+
+        foreach (string existing in RecentFolders)
+        {
+            if (updated.Count >= AppSettings.MaximumRecentFolders) break;
+            if (!string.Equals(existing, folder, StringComparison.OrdinalIgnoreCase))
+                updated.Add(existing);
+        }
+
+        RecentFolders.ReplaceAll(updated);
+    }
+
+    [RelayCommand]
+    private async Task OpenRecent(string? folder)
+    {
+        if (!string.IsNullOrEmpty(folder)) await OpenPathAsync(folder);
+    }
+
+    [RelayCommand]
+    private void ClearSearch() => SearchText = string.Empty;
+
+    [RelayCommand]
+    private void ToggleSubfolders() => IncludeSubfolders = !IncludeSubfolders;
+
+    [RelayCommand]
+    private void SetSort(string? order)
+    {
+        if (Enum.TryParse(order, out SortOrder parsed)) SortOrder = parsed;
+    }
+
+    public bool IsSortedByFileName => SortOrder == SortOrder.FileName;
+    public bool IsSortedByFamily => SortOrder == SortOrder.FamilyName;
+    public bool IsSortedByFormat => SortOrder == SortOrder.Format;
+
+    /// <summary>Puts the window back the way the user left it.</summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        IncludeSubfolders = settings.IncludeSubfolders;
+        SortOrder = settings.SortOrder;
+
+        if (!string.IsNullOrWhiteSpace(settings.PreviewText))
+            Preview.PreviewText = settings.PreviewText;
+
+        Preview.PointSize = Math.Clamp(
+            settings.PreviewPointSize, PreviewViewModel.MinimumPointSize, PreviewViewModel.MaximumPointSize);
+        Preview.DarkBackground = settings.DarkPreview;
+
+        Gallery.GallerySize = Math.Clamp(
+            settings.GallerySize, GalleryViewModel.MinimumSize, GalleryViewModel.MaximumSize);
+
+        GlyphMap.CellSize = Math.Clamp(
+            settings.GlyphCellSize, GlyphMapViewModel.MinimumCellSize, GlyphMapViewModel.MaximumCellSize);
+
+        CurrentView = settings.SelectedView;
+        CurrentPanel = (int)settings.SelectedPanel < AvailablePanelCount
+            ? settings.SelectedPanel
+            : SingleFontPanel.Preview;
+
+        RecentFolders.ReplaceAll(settings.RecentFolders
+            .Where(folder => !string.IsNullOrWhiteSpace(folder))
+            .Take(AppSettings.MaximumRecentFolders));
+    }
+
+    /// <summary>Records the current state for next time.</summary>
+    public void CaptureSettings(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        settings.IncludeSubfolders = IncludeSubfolders;
+        settings.SortOrder = SortOrder;
+        settings.PreviewText = Preview.PreviewText;
+        settings.PreviewPointSize = Preview.PointSize;
+        settings.DarkPreview = Preview.DarkBackground;
+        settings.GallerySize = Gallery.GallerySize;
+        settings.GlyphCellSize = GlyphMap.CellSize;
+        settings.SelectedView = CurrentView;
+        settings.SelectedPanel = CurrentPanel;
+        settings.LastFolder = string.IsNullOrEmpty(CurrentFolder) ? null : CurrentFolder;
+        settings.LastSelectedFile = SelectedFont?.File.Path;
+        settings.RecentFolders = [.. RecentFolders];
+    }
+
+    /// <summary>
+    /// Reopens whatever was on screen last time.
+    /// </summary>
+    /// <remarks>
+    /// A folder that has since been deleted or unplugged is not an error worth
+    /// complaining about on startup; the app simply opens empty.
+    /// </remarks>
+    public async Task RestoreLastSessionAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (string.IsNullOrWhiteSpace(settings.LastFolder)) return;
+        if (!Directory.Exists(settings.LastFolder)) return;
+
+        await LoadFolderAsync(settings.LastFolder, settings.LastSelectedFile, cancellationToken);
+    }
+
     // --- Favourites ------------------------------------------------------------
 
     /// <summary>True when there is a favourites folder to work with.</summary>
@@ -498,9 +741,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             // The file is gone; so should the row be.
             Fonts.RemoveAt(index);
-            SelectedFont = Fonts.Count == 0
+            RefreshFilter();
+
+            SelectedFont = VisibleFonts.Count == 0
                 ? null
-                : Fonts[Math.Min(index, Fonts.Count - 1)];
+                : VisibleFonts[Math.Min(index, VisibleFonts.Count - 1)];
 
             OnPropertyChanged(nameof(FolderSummary));
             OnPropertyChanged(nameof(SelectedPosition));
@@ -653,13 +898,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void FirstFont()
     {
-        if (Fonts.Count > 0) SelectedFont = Fonts[0];
+        if (VisibleFonts.Count > 0) SelectedFont = VisibleFonts[0];
     }
 
     [RelayCommand]
     private void LastFont()
     {
-        if (Fonts.Count > 0) SelectedFont = Fonts[^1];
+        if (VisibleFonts.Count > 0) SelectedFont = VisibleFonts[^1];
     }
 
     /// <summary>
@@ -671,13 +916,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// </remarks>
     private void MoveSelection(int delta)
     {
-        if (Fonts.Count == 0) return;
+        // Walks what is on screen, not the whole folder: with a search active, Ctrl+Down
+        // should step through the matches.
+        if (VisibleFonts.Count == 0) return;
 
-        int index = SelectedFont is null ? -1 : Fonts.IndexOf(SelectedFont);
-        int next = Math.Clamp(index + delta, 0, Fonts.Count - 1);
+        int index = SelectedFont is null ? -1 : VisibleFonts.IndexOf(SelectedFont);
+        int next = Math.Clamp(index + delta, 0, VisibleFonts.Count - 1);
 
-        if (index < 0) next = delta > 0 ? 0 : Fonts.Count - 1;
-        if (next != index) SelectedFont = Fonts[next];
+        if (index < 0) next = delta > 0 ? 0 : VisibleFonts.Count - 1;
+        if (next != index) SelectedFont = VisibleFonts[next];
     }
 
     private void CancelMetadataScan()

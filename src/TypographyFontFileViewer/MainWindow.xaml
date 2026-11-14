@@ -18,7 +18,12 @@
         TextOptions.TextFormattingMode="Display"
         WindowStartupLocation="CenterScreen">
 
+    <Window.CommandBindings>
+        <CommandBinding Command="Find" Executed="OnFocusSearch" />
+    </Window.CommandBindings>
+
     <Window.InputBindings>
+        <KeyBinding Key="F" Modifiers="Control" Command="Find" />
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenFileCommand}" />
         <KeyBinding Key="O" Modifiers="Control+Shift" Command="{Binding OpenFolderCommand}" />
         <!-- Next and previous work from anywhere, including inside the text box. -->
@@ -29,6 +34,7 @@
         <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
         <KeyBinding Key="D" Modifiers="Control" Command="{Binding ToggleFavoriteCommand}" />
         <KeyBinding Key="F" Modifiers="Control+Shift" Command="{Binding OpenFavoritesCommand}" />
+        <KeyBinding Key="S" Modifiers="Control+Shift" Command="{Binding ToggleSubfoldersCommand}" />
         <!-- The numbers run 1 to 4 across the whole window, as they did when these were
              four flat tabs: 1, 3 and 4 are panels of the single-font view, 2 is the
              gallery. Ctrl+3 and Ctrl+4 fall back to Preview until Phase 6 builds them. -->
@@ -47,6 +53,20 @@
                           Command="{Binding OpenFileCommand}" />
                 <MenuItem Header="Open _Folder…" InputGestureText="Ctrl+Shift+O"
                           Command="{Binding OpenFolderCommand}" />
+
+                <MenuItem Header="Recent folders"
+                          ItemsSource="{Binding RecentFolders}"
+                          IsEnabled="{Binding RecentFolders.Count}">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Header" Value="{Binding}" />
+                            <Setter Property="Command"
+                                    Value="{Binding DataContext.OpenRecentCommand,
+                                            RelativeSource={RelativeSource AncestorType=Window}}" />
+                            <Setter Property="CommandParameter" Value="{Binding}" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="Show _Favorites folder" InputGestureText="Ctrl+Shift+F"
                           Command="{Binding OpenFavoritesCommand}" />
@@ -76,6 +96,21 @@
                 <MenuItem Header="_Bigger" InputGestureText="Ctrl+=" Click="OnBiggerClick" />
                 <MenuItem Header="_Smaller" InputGestureText="Ctrl+-" Click="OnSmallerClick" />
                 <Separator />
+                <MenuItem Header="Sort by">
+                    <MenuItem Header="File name" IsCheckable="True"
+                              IsChecked="{Binding IsSortedByFileName, Mode=OneWay}"
+                              Command="{Binding SetSortCommand}" CommandParameter="FileName" />
+                    <MenuItem Header="Family name" IsCheckable="True"
+                              IsChecked="{Binding IsSortedByFamily, Mode=OneWay}"
+                              Command="{Binding SetSortCommand}" CommandParameter="FamilyName" />
+                    <MenuItem Header="Format" IsCheckable="True"
+                              IsChecked="{Binding IsSortedByFormat, Mode=OneWay}"
+                              Command="{Binding SetSortCommand}" CommandParameter="Format" />
+                </MenuItem>
+                <MenuItem Header="Include _subfolders" InputGestureText="Ctrl+Shift+S"
+                          IsCheckable="True"
+                          IsChecked="{Binding IncludeSubfolders, Mode=TwoWay}" />
+                <Separator />
                 <MenuItem Header="_Dark preview background"
                           IsCheckable="True"
                           IsChecked="{Binding Preview.DarkBackground, Mode=TwoWay}" />
@@ -100,6 +135,33 @@
                         <TextBlock Text="Favorites" />
                     </StackPanel>
                 </Button>
+                <Separator />
+
+                <!-- Search filters both the list and the gallery, as you type. -->
+                <TextBlock Text="&#xE721;"
+                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="4,0,4,0"
+                           Foreground="{StaticResource MutedText}" />
+                <TextBox x:Name="SearchBox"
+                         Width="190"
+                         VerticalAlignment="Center"
+                         KeyDown="OnSearchKeyDown"
+                         ToolTip="Filter by file name, family or style. Ctrl+F to focus, Esc to clear."
+                         Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=120}" />
+                <Button Content="&#x2715;"
+                        Padding="6,1"
+                        Margin="2,0,0,0"
+                        ToolTip="Clear the search"
+                        Command="{Binding ClearSearchCommand}"
+                        Visibility="{Binding IsFiltered, Converter={StaticResource BooleanToVisibility}}" />
+
+                <CheckBox Content="Subfolders"
+                          Margin="12,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="Include fonts in subfolders. Ctrl+Shift+S"
+                          IsChecked="{Binding IncludeSubfolders, Mode=TwoWay}" />
             </ToolBar>
         </ToolBarTray>
 
@@ -246,7 +308,7 @@
                        HorizontalAlignment="Center"
                        Foreground="{StaticResource MutedText}"
                        IsHitTestVisible="False"
-                       Visibility="{Binding Fonts.Count, Converter={StaticResource EmptyToVisibility}}" />
+                       Visibility="{Binding VisibleFonts.Count, Converter={StaticResource EmptyToVisibility}}" />
         </Grid>
 
     </DockPanel>

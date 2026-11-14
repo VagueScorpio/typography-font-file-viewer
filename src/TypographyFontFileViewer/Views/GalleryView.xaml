@@ -61,7 +61,7 @@
         </Border>
 
         <ListBox x:Name="GalleryList"
-                 ItemsSource="{Binding Fonts}"
+                 ItemsSource="{Binding VisibleFonts}"
                  SelectedItem="{Binding SelectedFont, Mode=TwoWay}"
                  SelectionChanged="OnSelectionChanged"
                  MouseDoubleClick="OnRowDoubleClick"

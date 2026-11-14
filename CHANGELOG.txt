@@ -4,6 +4,7 @@
 
 TABLE OF CONTENTS
   v1.0.0 (unreleased)
+    - Phase 7: search, subfolders, settings, polish
     - Phase 6: the Glyphs and Info panels
     - Phase 5: favourites
     - Blueprint v1.1: nested panels replace the four flat tabs
@@ -20,6 +21,72 @@ TABLE OF CONTENTS
 --------------------------------------------------------------------------------
  v1.0.0 (unreleased)
 --------------------------------------------------------------------------------
+
+Phase 7: search, subfolders, settings, polish
+  WHAT: A search box, a subfolder toggle, three sort orders, a recent-folders
+        menu, settings that survive a restart, and a global exception handler
+        that writes to TypographyFontFileViewer.log beside the exe. New
+        Core/SortOrder.cs; AppSettings grew from one field to fourteen.
+  WHY:  The last of the blueprint's Section 7 to 10 behaviour. A folder of two
+        thousand fonts needs a way to find one, and an app that forgets where
+        you were every time you close it is tiring to use.
+  HOW:  Search filters file name, family and style as you type, and the sidebar
+        and gallery share the result because both bind to the same filtered
+        collection. Sorting re-orders the underlying list rather than using a
+        view's sort descriptions, because family names arrive from the
+        background pass long after the rows do and a view would not notice them
+        changing — so a family sort is also re-applied once that pass finishes.
+        Settings are written on close and on Windows shutting down, atomically,
+        with enums stored as names so the file stays readable.
+
+  TWO BUGS FOUND ON THE WAY, both real rather than test-only:
+        - Filtering through a WPF CollectionView tied the view model to the
+          thread that created it, so any background continuation touching the
+          list threw. The app happened to work because continuations resume on
+          the UI thread, but it was a thread-affinity bug waiting for a day when
+          one did not. Filtering is now done explicitly and the view model has
+          no dispatcher affinity at all.
+        - Superseding a render disposed the token source the previous request
+          was still holding, which could turn a cancelled render into an
+          ObjectDisposedException. Two overlapping rescans found it. Superseded
+          sources are now cancelled and left for the collector, which is all
+          they need.
+        - A third, found by looking at the screen rather than the tests:
+          refreshing the filter resets the bound lists, and a list clearing its
+          own selection writes null straight back into the view model. Searching
+          therefore blanked the preview even when the selected font was still on
+          screen. The intended selection is now captured before the reset.
+
+  DETAIL WORTH KNOWING:
+        - Ctrl+F focuses the search, Esc clears it and hands focus back.
+        - Navigation walks the matches, not the whole folder, so Ctrl+Down steps
+          through what a search left on screen.
+        - The sidebar header says "9 of 40 fonts" while a search is on.
+        - A window position saved on a monitor that is no longer plugged in
+          falls back to the default rather than opening off-screen.
+        - A setting out of range — a hand-edited or damaged file — is clamped
+          rather than trusted.
+        - Settings written by a later version keep the fields this one does not
+          understand.
+        - The log records unhandled errors with a timestamp, the OS and the
+          runtime version, and the app offers to carry on rather than closing:
+          one failed render should not cost the user the folder they had open.
+          Faulted tasks nobody awaited are recorded and never shown, since fast
+          scrolling produces them routinely.
+
+  VERIFIED: 280 tests, all passing, zero build warnings.
+        - Six keystrokes of search across 1,000 fonts in well under the budget,
+          with the folder itself untouched.
+        - From the published exe: opening the corpus and switching to Gallery,
+          then closing, wrote the window bounds, last folder, last selected
+          file, recent folders and the view; relaunching with no argument at all
+          brought all of it back.
+        - "noto serif" matches nine of forty by family name — the files are
+          called NotoSerif-*.ttf, so only the family match can find them — and
+          the first match is selected and previewed.
+        - Subfolder toggling rescans wider and narrower; sorting by family
+          groups a family into one run and keeps the selection; the recent list
+          stops at ten and moves a reopened folder back to the top.
 
 Phase 6: the Glyphs and Info panels
   WHAT: The single-font view's panel strip is full: Preview, Glyphs and Info.
