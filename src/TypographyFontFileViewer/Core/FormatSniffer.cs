@@ -11,11 +11,17 @@ public static class FormatSniffer
     /// <summary>How many bytes <see cref="Sniff"/> wants. Reading more is harmless.</summary>
     public const int HeaderBytes = 64;
 
-    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> Supported = new(StringComparer.OrdinalIgnoreCase)
     {
         ".ttf", ".otf", ".ttc", ".otc", ".woff", ".woff2",
         ".pfb", ".pfa", ".fon", ".fnt", ".bdf", ".pcf", ".dfont",
     };
+
+    /// <summary>
+    /// Every font extension the app lists, in the order the README's table names them.
+    /// Exposed so the documented list can be checked against this one.
+    /// </summary>
+    public static IReadOnlyCollection<string> SupportedExtensions { get; } = [.. Supported];
 
     private static readonly HashSet<string> CompanionExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -39,7 +45,7 @@ public static class FormatSniffer
 
     /// <summary>True for a font extension the app lists.</summary>
     public static bool IsSupportedExtension(string extension)
-        => !string.IsNullOrEmpty(extension) && SupportedExtensions.Contains(extension);
+        => !string.IsNullOrEmpty(extension) && Supported.Contains(extension);
 
     /// <summary>
     /// True for metrics and info files that belong to a Type 1 font. They are not

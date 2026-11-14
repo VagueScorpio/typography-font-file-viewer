@@ -148,6 +148,57 @@ public class FontEngineTests
             "Both faces of the collection rendered identically.");
     }
 
+    // --- Mac data-fork suitcases -----------------------------------------------
+
+    /// <summary>
+    /// A .dfont is a classic Mac resource fork written into an ordinary file's data
+    /// fork, with each font inside as an 'sfnt' resource. It is the only v1.0 format
+    /// that needs the resource-fork reader rather than a plain SFNT parse, and the one
+    /// the corpus has to synthesise because no Windows tool writes it.
+    /// </summary>
+    [Fact]
+    public async Task DataForkSuitcase_ReportsEveryFaceSeparately()
+    {
+        string path = TestFonts.Require("TestSuitcase.dfont");
+
+        using var service = new RenderService();
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+
+        Assert.Equal(2, summaries.Length);
+        Assert.All(summaries, summary =>
+        {
+            Assert.False(summary.IsBroken, summary.Error);
+            Assert.Equal(2, summary.FaceCount);
+            Assert.Equal(FontFormat.DataFork, summary.Format);
+            Assert.True(summary.GlyphCount > 100, $"only {summary.GlyphCount} glyphs");
+        });
+
+        Assert.Equal(0, summaries[0].FaceIndex);
+        Assert.Equal(1, summaries[1].FaceIndex);
+        Assert.NotEqual(summaries[0].DisplayName, summaries[1].DisplayName);
+    }
+
+    [Fact]
+    public async Task DataForkSuitcase_RendersRealText()
+    {
+        string path = TestFonts.Require("TestSuitcase.dfont");
+        using var service = new RenderService();
+
+        RenderedText rendered = await service.RenderTextAsync(
+            FaceKey.For(path, 0), "Suitcase", 32, 96, 0, RenderStyle.Light,
+            cancellationToken: TestCancellation);
+
+        // Counting dark pixels alone would pass on a row of .notdef boxes, so compare
+        // two different strings: a real face draws them differently.
+        RenderedText other = await service.RenderTextAsync(
+            FaceKey.For(path, 0), "iiiiiiii", 32, 96, 0, RenderStyle.Light,
+            cancellationToken: TestCancellation);
+
+        Assert.True(rendered.Width > 0 && rendered.Height > 0);
+        Assert.False(rendered.Bgra.AsSpan().SequenceEqual(other.Bgra),
+            "Two different strings rendered identically; the face is probably all .notdef.");
+    }
+
     [Fact]
     public async Task SystemCollection_EnumeratesItsFaces()
     {

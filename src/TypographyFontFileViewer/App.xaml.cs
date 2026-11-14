@@ -43,7 +43,7 @@ public partial class App : Application
 
         MessageBoxResult answer = MessageBox.Show(
             BuildMessage(e.Exception, written, canContinue: true),
-            "Typography Font File Viewer",
+            Core.AppInfo.Name,
             MessageBoxButton.YesNo,
             MessageBoxImage.Error,
             MessageBoxResult.Yes);

@@ -631,20 +631,27 @@ Final deliverable folder: `publish\TypographyFontFileViewer.exe` (only the exe; 
 
 ## 14. Acceptance Checklist
 
-- [ ] One `TypographyFontFileViewer.exe` runs on a PC with no .NET installed.
-- [ ] Opens TTF, OTF, TTC, OTC, WOFF, WOFF2, PFB/PFA, FON/FNT, BDF, PCF, DFONT.
-- [ ] Opening one font lists every font in its folder. Scrolling or Ctrl+↓/↑ moves through all of them.
-- [ ] The Gallery view shows every font rendered in its own face, at S/M/L/XL.
-- [ ] Favorite copies to `Favorite Fonts` next to the exe. Un-favorite sends the copy to the Recycle Bin.
-- [ ] Stars stay correct after restart and for renamed duplicates.
-- [ ] Custom preview text + size slider + waterfall.
-- [ ] Glyph map with copy-on-click.
-- [ ] Info panel with copy-all.
-- [ ] Search + subfolder toggle.
-- [ ] Bad files show ⚠ and never crash the app.
-- [ ] No files locked while viewing.
-- [ ] Settings and favorites persist in `TypographyFontFileViewer.json` next to the exe.
-- [ ] README, CHANGELOG.txt, `TypographyFontFileViewer-v1.0.zip` delivered.
+- [x] One `TypographyFontFileViewer.exe` runs on a PC with no .NET installed.
+- [x] Opens TTF, OTF, TTC, OTC, WOFF, WOFF2, PFB/PFA, FON/FNT, BDF, PCF, DFONT.
+- [x] Opening one font lists every font in its folder. Scrolling or Ctrl+↓/↑ moves through all of them.
+- [x] The Gallery view shows every font rendered in its own face, at S/M/L/XL.
+- [x] Favorite copies to `Favorite Fonts` next to the exe. Un-favorite sends the copy to the Recycle Bin.
+- [x] Stars stay correct after restart and for renamed duplicates.
+- [x] Custom preview text + size slider + waterfall.
+- [x] Glyph map with copy-on-click.
+- [x] Info panel with copy-all.
+- [x] Search + subfolder toggle.
+- [x] Bad files show ⚠ and never crash the app.
+- [x] No files locked while viewing.
+- [x] Settings and favorites persist in `TypographyFontFileViewer.json` next to the exe.
+- [x] README, CHANGELOG.txt, `TypographyFontFileViewer-v1.0.zip` delivered.
+
+Ticked at v1.0 against the **published exe**, run from a folder containing nothing but
+itself, not against a debug build. Two qualifications, both recorded in the CHANGELOG's
+Phase 9 entry and the README's Known limits: the first item was verified by launching
+with `dotnet` off `PATH` and `DOTNET_ROOT` pointed at a folder that does not exist,
+which is as far as a machine with .NET installed can go — a genuinely clean PC is still
+untested; and the Section 13.4 memory target is not met.
 
 ---
 

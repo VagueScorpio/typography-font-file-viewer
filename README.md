@@ -4,17 +4,32 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: Phase 8 complete.** Open a font and the whole folder loads beside it. A
-> switch in the header moves between **Single font** — one font large, cycled with
-> `Ctrl+Down` — and **Gallery**, every font in the folder drawn in its own face at your
-> choice of four sizes, tested at 1,361 rows. Star a font with `Ctrl+D` and it is copied
-> into `Favorite Fonts` beside the app. Every format v1.0 promises opens except
-> `.dfont`. Still to come: the v1.0 release. See
-> [Roadmap](#roadmap) and [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
+> **Status: v1.0 released.** Every format the blueprint promises opens, both views
+> work, favourites persist, and the exe is **60.4 MB** reaching a window in
+> **under a second**. See [Roadmap](#roadmap), [Known limits](#known-limits) and
+> [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ---
 
-## What it will do
+## Running it
+
+Take `TypographyFontFileViewer.exe` out of `TypographyFontFileViewer-v1.0.zip`, put it
+in a folder you can write to, and double-click it. Nothing is installed, nothing is
+unpacked beside it, and nothing is written to the registry. To remove it, delete the
+exe and the two or three files listed under [Portable files](#portable-files).
+
+Windows SmartScreen will warn about an unsigned exe downloaded from the internet;
+**More info** then **Run anyway** gets past it. Building it yourself from this
+repository avoids the warning entirely.
+
+The zip is a build output, not a committed file — `publish.bat` produces the identical
+exe from this source. See [Building](#building).
+
+You can also start it with a font file or a folder as the only argument, drag either
+onto the window, or make it the handler for font files — see
+[Making it the default font viewer](#making-it-the-default-font-viewer).
+
+## What it does
 
 - **Open one font, get the whole folder.** Double-click any font file and every
   supported font in that folder loads into a scrollable list — no opening files
@@ -26,6 +41,8 @@ and run it.
 - **Favorites.** Star a font and the file is *copied* into a `Favorite Fonts`
   folder next to the exe. Un-starring sends that copy to the Recycle Bin.
 - **Custom preview text,** a 6–288 pt size slider and a waterfall of sizes.
+- **Colour fonts in colour.** Emoji and other `COLR`/`CPAL` or bitmap-colour faces are
+  composited rather than flattened to outlines.
 - **Glyph map** with click-to-copy, a jump box, and a details overlay; virtualized
   and tested on a 30,000-glyph CJK font.
 - **Font info panel** — family, style, version, designer, license, embedding
@@ -48,7 +65,7 @@ and run it.
 | `.fon`, `.fnt` | Windows bitmap font (fixed sizes) |
 | `.bdf` | X11 bitmap, text (fixed sizes) |
 | `.pcf`, `.pcf.gz` | X11 bitmap, binary (fixed sizes) |
-| `.dfont` | Mac data-fork suitcase |
+| `.dfont` | Mac data-fork suitcase (one list entry per `sfnt` resource) |
 
 Formats are detected by **magic bytes first, extension second**, so a `.ttf` that
 is really CFF-based still opens. `.afm`, `.pfm` and `.inf` are treated as
@@ -112,11 +129,16 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) on Windows.
 publish.bat
 ```
 
-Output: `publish\TypographyFontFileViewer.exe` — a self-contained, single-file `win-x64`
-build with the runtime, WPF and the native FreeType / HarfBuzz libraries packed
-inside. Symbols are embedded, so no `.pdb` ships beside the exe. Expect an exe of
-tens of MB; that is the cost of running with nothing installed. As of Phase 0 it is
-60.2 MB and reaches a window in well under a second.
+`publish.bat` empties `publish\` first, so what is left is exactly what the build
+produced: one `TypographyFontFileViewer.exe`, self-contained and single-file for
+`win-x64`, with the runtime, WPF and the native FreeType / HarfBuzz libraries packed
+inside. Symbols are embedded, so no `.pdb` ships beside it.
+
+At v1.0 the exe is **63,298,809 bytes (60.4 MB)** and reaches a usable window in
+**0.84–0.99 s** with a font on the command line, measured from a folder holding
+nothing but the exe. The very first launch, which also unpacks the native libraries,
+took 1.02 s. The blueprint's target is under 2 s. Tens of MB is the cost of needing
+nothing installed on the target PC.
 
 To build and test during development:
 
@@ -148,11 +170,12 @@ tools\.venv\Scripts\python.exe -m pip install -r tools\requirements.txt
 tools\.venv\Scripts\python.exe tools\make-test-fonts.py
 ```
 
-That fetches open-licensed fonts, derives static instances and a `.ttc` from the
-variable ones, and converts every SFNT font into matching `.woff` and `.woff2` — the
-triples the WOFF decoders are checked against. Roughly 20 MB, covering every v1.0
-format except `.dfont`. Details in [tools/README.md](tools/README.md). Tests skip with
-a message when a font is missing, so the suite runs without this step.
+That fetches open-licensed fonts, derives static instances from the variable ones,
+packs two of them into a `.ttc` and into a `.dfont`, and converts every SFNT font into
+matching `.woff` and `.woff2` — the triples the WOFF decoders are checked against.
+Roughly 21 MB, covering every v1.0 format. Details in
+[tools/README.md](tools/README.md). Tests skip with a message when a font is missing,
+so the suite runs without this step.
 
 ## Architecture at a glance
 
@@ -203,7 +226,34 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 6 | Glyphs and Info panels | **Done** |
 | 7 | Search, subfolders, settings persistence, polish | **Done** |
 | 8 | Hardening against the stress list | **Done** |
-| 9 | Release: README, changelog, zip, size and cold-start report | Next |
+| 9 | Release: README, changelog, zip, size and cold-start report | **Done** |
+
+Ideas deliberately left out of v1.0 — installing fonts to Windows, variable-font axis
+sliders, OpenType feature toggles, side-by-side compare, a full dark theme, EOT and
+SVG, specimen export, and auto-refresh on file changes — are listed in blueprint
+Section 15.
+
+## Known limits
+
+Measured and recorded rather than smoothed over:
+
+- **Memory misses its target.** Blueprint Section 13.4 asks for under 400 MB with a
+  2,000-font folder open in the gallery. Listing and the full metadata sweep settle at
+  297 MB, but scrolling the whole gallery repeatedly reaches 440–500 MB. Every cache is
+  bounded and the figure oscillates rather than climbing, and the app stays responsive,
+  but it is over. What remains is churn, not retention: each render allocates a BGRA
+  buffer, anything over 85 KB lands on the large object heap, and that heap is not
+  compacted by default. The fix is to pool those buffers, which first needs
+  `RenderedText` to expose a length-bounded view rather than a raw array.
+- **Not yet verified by a person:** a network share, a USB drive physically pulled
+  mid-scan, 200% display scaling, and a second monitor at a different DPI. The
+  automated stress tests cover a folder vanishing mid-use, which is the same code path
+  as the pulled drive, but not the hardware behaviour around it.
+- **A clean PC is still untested.** The exe starts here with `dotnet` off `PATH` and
+  `DOTNET_ROOT` pointed at nothing, which is as close as a machine with .NET installed
+  can get to proving it is self-contained.
+- **Variable fonts preview at their default instance.** Axes are listed in the Info
+  panel; there are no sliders.
 
 ## Repository layout
 

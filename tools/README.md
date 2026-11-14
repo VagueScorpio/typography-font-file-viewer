@@ -48,7 +48,8 @@ re-run: it keeps what is already there unless you pass `--force`.
    Windows `.fon`.
 2. **Derives** static instances at `wght` 400 and 700 from each variable font
    using `fontTools.varLib.instancer`, then packs two of them into a
-   `TestCollection.ttc` so the collection-handling paths have something to open.
+   `TestCollection.ttc`, and the same two into a `TestSuitcase.dfont`, so the
+   collection and resource-fork paths both have something to open.
 3. **Converts** every `.ttf` and `.otf` in the folder into matching `.woff` and
    `.woff2`, all three built from the same original.
 4. **Verifies** each triple opens with the same glyph count and family name.
@@ -67,7 +68,7 @@ family names and rendered outlines, so every font must exist in all three forms.
 | `.woff`, `.woff2` | Built here from every SFNT in the folder |
 | `.pfb` / `.pfa` | URW Nimbus Roman |
 | `.bdf`, `.pcf`, `.fon` | Spleen |
-| `.dfont` | **Not automated** — needs a macOS data-fork suitcase, copied in by hand |
+| `.dfont` | Built here: two static instances wrapped in a Mac resource fork |
 
 Windows system fonts stay where they are. `cambria.ttc`, `msyh.ttc` and
 `seguiemj.ttf` are read in place from `C:\Windows\Fonts` by the tests that need a

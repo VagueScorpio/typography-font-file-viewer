@@ -280,6 +280,86 @@ def build_collection(statics: list[Path], out_dir: Path, force: bool) -> Path | 
         return None
 
 
+def build_dfont(statics: list[Path], out_dir: Path, force: bool) -> Path | None:
+    """
+    Pack two static faces into a Mac data-fork suitcase (.dfont).
+
+    A .dfont is a classic Mac resource fork written into an ordinary file's data
+    fork, with each font stored as an 'sfnt' resource. It is the one v1.0 format
+    nothing else in the corpus produces and that no converter on Windows writes,
+    so it is built here from the documented layout rather than sourced. FreeType
+    reads the structure directly, which is what the app relies on.
+    """
+    import struct
+
+    if len(statics) < 2:
+        return None
+
+    target = out_dir / "TestSuitcase.dfont"
+    if target.exists() and not force:
+        log(f"  kept     {target.name}  (already present)")
+        return target
+
+    # Resource ids for fonts conventionally start at 128.
+    resources = [
+        (b"sfnt", 128 + index, path.read_bytes())
+        for index, path in enumerate(statics[:2])
+    ]
+
+    # The resource data: each entry is its length followed by its bytes, padded
+    # out to a four-byte boundary the way the Resource Manager wrote them.
+    data = bytearray()
+    offsets: list[int] = []
+    for _type, _id, payload in resources:
+        offsets.append(len(data))
+        data += struct.pack(">I", len(payload))
+        data += payload
+        while len(data) % 4:
+            data += b"\0"
+
+    types: list[bytes] = []
+    for type_, _id, _payload in resources:
+        if type_ not in types:
+            types.append(type_)
+
+    # The type list: a count, then eight bytes per type. Each type points at its
+    # reference list by an offset measured from the start of the type list.
+    type_list_size = 2 + 8 * len(types)
+    entries = bytearray(struct.pack(">H", len(types) - 1))
+    references = bytearray()
+
+    for type_ in types:
+        members = [(res_id, n) for n, (t, res_id, _p) in enumerate(resources) if t == type_]
+        entries += type_
+        entries += struct.pack(">H", len(members) - 1)
+        entries += struct.pack(">H", type_list_size + len(references))
+        for res_id, index in members:
+            references += struct.pack(">hh", res_id, -1)   # id, and no name
+            references += b"\0"                            # attributes
+            references += struct.pack(">I", offsets[index])[1:]  # a 24-bit offset
+            references += struct.pack(">I", 0)             # handle, unused on disk
+
+    type_list = bytes(entries) + bytes(references)
+
+    # The map: sixteen reserved bytes that copy the header, a handle, a file
+    # reference number and attributes, then the two offsets, then the type list.
+    resource_map = bytearray(24)
+    resource_map += struct.pack(">HH", 28, 28 + len(type_list))
+    resource_map += type_list
+
+    data_offset = 256
+    out = bytearray(struct.pack(
+        ">IIII", data_offset, data_offset + len(data), len(data), len(resource_map)))
+    out += b"\0" * (data_offset - len(out))
+    out += data
+    out += bytes(resource_map)
+
+    target.write_bytes(bytes(out))
+    names = ", ".join(path.name for path in statics[:2])
+    log(f"  built    {target.name}  (2 faces: {names})")
+    return target
+
+
 def make_woff_pair(sfnt_path: Path, force: bool) -> list[Path]:
     """Write X.woff and X.woff2 beside X.ttf / X.otf, from the same original."""
     from fontTools.ttLib import TTFont
@@ -404,6 +484,11 @@ def main() -> int:
         log("  (needs two static faces)")
     log("")
 
+    log("Building a Mac data-fork suitcase")
+    if build_dfont(statics, out_dir, args.force) is None:
+        log("  (needs two static faces)")
+    log("")
+
     log("Converting to WOFF 1.0 and WOFF 2.0")
     sfnt_files = sorted(
         path for path in out_dir.iterdir()
@@ -455,7 +540,7 @@ def main() -> int:
     if not {".fon", ".fnt"} & suffixes:
         missing.append(".fon/.fnt (or read C:\\Windows\\Fonts in place)")
     if ".dfont" not in suffixes:
-        missing.append(".dfont (needs a macOS data-fork suitcase; see tests/fonts/README.md)")
+        missing.append(".dfont (build_dfont needs two static faces)")
     if not {".pfb", ".pfa"} & suffixes:
         missing.append(".pfb/.pfa (PostScript Type 1)")
     if missing:

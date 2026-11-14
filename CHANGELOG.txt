@@ -3,7 +3,8 @@
 ================================================================================
 
 TABLE OF CONTENTS
-  v1.0.0 (unreleased)
+  v1.0.0 - 2026-11-14
+    - Phase 9: release
     - Phase 8: hardening
     - Phase 7: search, subfolders, settings, polish
     - Phase 6: the Glyphs and Info panels
@@ -20,8 +21,99 @@ TABLE OF CONTENTS
     - Repository scaffold
 
 --------------------------------------------------------------------------------
- v1.0.0 (unreleased)
+ v1.0.0 - 2026-11-14  (first release)
 --------------------------------------------------------------------------------
+
+Phase 9: release
+  WHAT: The v1.0 deliverable. publish.bat rewritten, the published exe exercised
+        from an empty folder, the last untested format closed, the version made
+        single-source, README finished, and TypographyFontFileViewer-v1.0.zip
+        built.
+  WHY:  Phase 9 asks for a release that has been run rather than assumed, and a
+        reported exe size and cold-start time.
+
+  THE EXE, MEASURED:
+        - 63,298,809 bytes (60.4 MB), one file, nothing beside it.
+        - Window up in 838, 882, 889, 992 and 1,016 ms across five runs from a
+          folder containing only the exe, with a font on the command line. The
+          slowest was the very first launch, which also unpacks the native
+          libraries. Target: under 2 s. MET.
+        - Launched again with dotnet off PATH and DOTNET_ROOT pointed at a folder
+          that does not exist: window in 979 ms. That is as close as a machine
+          with .NET installed can come to proving the exe is self-contained; a
+          genuinely clean PC is still someone's job.
+
+  WHAT THE EMPTY-FOLDER RUN FOUND:
+        - 42 files in the font folder, including a zero-byte .ttf and 5 KB of
+          random bytes named .woff2, listed as 44 entries (two collections
+          expand) with exactly 2 marked unreadable. The broken WOFF2 shows
+          "Expected the tag 'wOF2' but found '$I??'." in the gallery rather than
+          failing the row.
+        - Ctrl+D wrote Favorite Fonts\Inter-Regular.ttf beside the exe; after a
+          restart the star was still on the right row and the status bar read
+          "44 fonts - 1 star - 2 unreadable".
+        - Renaming, deleting and overwriting the displayed font from another
+          process all succeeded while the app had it open, and the app carried
+          on. Nothing is file-locked.
+        - Beside the exe afterwards: the exe, TypographyFontFileViewer.json and
+          Favorite Fonts\. No log file, because nothing went wrong.
+
+  .DFONT IS NO LONGER UNTESTED:
+        It was the one v1.0 format with no automated source, because no Windows
+        tool writes a Mac data-fork suitcase and the corpus could not build one.
+        tools/make-test-fonts.py now writes one from the documented resource-fork
+        layout: an 'sfnt' resource per font, a type list, a reference list with
+        24-bit data offsets, and the map that ties them together. FreeType reads
+        the structure directly, which is what the app was relying on untested.
+        The corpus gains TestSuitcase.dfont (two faces) and two tests: both faces
+        enumerate separately with the DFONT badge, and the face renders two
+        different strings differently, which a .notdef row would not.
+        Verified in the published exe as well as in the tests.
+
+  THE VERSION NOW HAS ONE SOURCE:
+        The standing convention bumps the version in the csproj, the title bar
+        and the zip name. Three hand-kept copies of one number drift, and a title
+        bar claiming the wrong version is the sort of thing nobody notices until
+        a bug report quotes it. New Core/AppInfo.cs reads the assembly version;
+        the title bar, the About box and the crash dialog ask it, and only the
+        csproj's <Version> is authoritative. Four new tests in ReleaseTests.cs
+        guard the rest of the convention: the displayed version matches the
+        csproj, the changelog has an entry for it, every PackageReference is
+        listed in the README with its licence, and every extension the sniffer
+        accepts appears in the README's format table.
+
+  ONE README CLAIM WAS WRONG:
+        The Known limits section first said colour fonts render as outlines.
+        Checking it instead of trusting it: Segoe UI Emoji draws in full colour
+        at every waterfall size, because the rasterizer already asks for
+        FT_LOAD_COLOR and copies BGRA bitmaps through. The line became a feature
+        rather than a limit. This is the second time in this project that a
+        plausible sentence about the code was false; it is cheaper to run the
+        thing than to reason about it.
+
+  HOW:  - publish.bat now empties publish\ before building, so a file an earlier
+          configuration produced cannot sit beside the exe and look like part of
+          the deliverable. It fails loudly if the build fails or the exe is
+          missing, and prints the size and the full contents of publish\.
+        - README rewritten for a released app: a Running it section with the
+          SmartScreen warning named, honest sizes and timings, a Known limits
+          section, and Phase 9 marked done.
+        - Deliverable: TypographyFontFileViewer-v1.0.zip, 57,650,280 bytes,
+          holding the exe, README.md, CHANGELOG.txt, LICENSE.txt and the
+          blueprint under one TypographyFontFileViewer-v1.0 folder. It is a
+          build output, so .gitignore keeps it out of the repository rather than
+          adding 57 MB of binary to every clone for ever.
+
+  VERIFIED:
+        302 tests pass, zero warnings. Every acceptance item in blueprint
+        Section 14 checked against the published exe, not the debug build.
+
+  STILL NEEDS A PERSON:
+        A network share, a USB drive physically pulled mid-scan, 200% display
+        scaling, a second monitor at a different DPI, and a PC with no .NET
+        installed at all. Memory with 2,000 fonts remains over target; Phase 8's
+        entry has the measurements and the named fix.
+
 
 Phase 8: hardening
   WHAT: The blueprint's Section 13.3 stress list, run and fixed. New

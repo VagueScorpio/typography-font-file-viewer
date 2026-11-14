@@ -19,6 +19,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // The XAML carries a title so the designer has something to show; the real one
+        // comes from the assembly version, so a version bump touches only the csproj.
+        Title = AppInfo.NameAndVersion;
+
         // Everything the app keeps lives beside the exe. Environment.ProcessPath is the
         // one that works in a single-file build; Assembly.Location is empty there.
         string appFolder = Path.GetDirectoryName(Environment.ProcessPath)
@@ -261,12 +265,13 @@ public partial class MainWindow : Window
     {
         MessageBox.Show(
             this,
-            "Typography Font File Viewer 1.0\n\n" +
+            $"{AppInfo.NameAndVersion}\n\n" +
             "A portable font viewer. Nothing is installed and nothing is written to the registry.\n\n" +
             $"Rendering by FreeType {_renderService.NativeVersion}, shaping by HarfBuzz.\n\n" +
-            "Portions of this software are copyright © 2026 The FreeType Project\n" +
-            "(www.freetype.org). All rights reserved.",
-            "About Typography Font File Viewer",
+            "FreeTypeSharp, HarfBuzzSharp and CommunityToolkit.Mvvm are used under the "
+            + "MIT License; FreeType itself under the FreeType License (FTL).\n\n" +
+            AppInfo.FreeTypeCredit,
+            $"About {AppInfo.Name}",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }
