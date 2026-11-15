@@ -25,8 +25,7 @@ public sealed record GlyphDetail
 
     public int AdvanceWidth { get; init; }
 
-    public int LeftSideBearing { get; init; }
-
+    /// <summary>The left side bearing is <see cref="MinX"/>; the two are the same number.</summary>
     public int MinX { get; init; }
     public int MinY { get; init; }
     public int MaxX { get; init; }

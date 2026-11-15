@@ -49,7 +49,6 @@ internal static class Woff2Decoder
     private sealed class DirectoryEntry
     {
         public required uint Tag { get; init; }
-        public required int TransformVersion { get; init; }
         public required uint OriginalLength { get; init; }
 
         /// <summary>Length in the compressed stream, which differs only when transformed.</summary>
@@ -157,7 +156,6 @@ internal static class Woff2Decoder
             directory[i] = new DirectoryEntry
             {
                 Tag = tag,
-                TransformVersion = transformVersion,
                 OriginalLength = originalLength,
                 StreamLength = transformLength,
                 IsTransformed = isTransformed,

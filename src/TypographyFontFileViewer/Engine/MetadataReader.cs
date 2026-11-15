@@ -241,7 +241,6 @@ internal static unsafe class MetadataReader
         return detail with
         {
             AdvanceWidth = (int)(long)metrics.horiAdvance,
-            LeftSideBearing = bearingX,
             MinX = bearingX,
             MaxX = bearingX + width,
             MinY = bearingY - height,

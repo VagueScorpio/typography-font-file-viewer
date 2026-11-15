@@ -216,9 +216,6 @@ public class ViewSwitchingTests : IDisposable
     [Fact]
     public void APanelPastTheEndOfTheStrip_FallsBackToPreview()
     {
-        using var service = new RenderService();
-        using var model = new MainViewModel(service);
-
         var converter = new EnumToIndexConverter();
 
         Assert.Equal(SingleFontPanel.Preview,

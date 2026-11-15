@@ -25,12 +25,6 @@ internal ref struct ByteReader
 
     public int Position { get; set; }
 
-    public int Length => _data.Length;
-
-    public int Remaining => _data.Length - Position;
-
-    public bool AtEnd => Position >= _data.Length;
-
     private void Require(int count)
     {
         if (count < 0 || Position > _data.Length - count)

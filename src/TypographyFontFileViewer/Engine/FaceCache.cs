@@ -139,8 +139,8 @@ internal sealed class FaceCache : IDisposable
     {
         while ((_byKey.Count > _maximumFaces || _bytes > _maximumBytes) && _order.Count > 1)
         {
-            LinkedListNode<LoadedFace>? oldest = _order.Last;
-            if (oldest is null) return;
+            // The loop condition guarantees a last node.
+            LinkedListNode<LoadedFace> oldest = _order.Last!;
 
             _order.RemoveLast();
             _byKey.Remove(oldest.Value.Key);

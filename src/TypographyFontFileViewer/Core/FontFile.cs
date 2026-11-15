@@ -24,8 +24,6 @@ public sealed record FontFile
     public IReadOnlyList<string> Companions { get; init; } = [];
 
     public string FileName => System.IO.Path.GetFileName(Path);
-
-    public string? Folder => System.IO.Path.GetDirectoryName(Path);
 }
 
 /// <summary>
