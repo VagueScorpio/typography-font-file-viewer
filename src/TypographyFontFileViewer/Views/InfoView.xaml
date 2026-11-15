@@ -9,11 +9,7 @@
 
     <DockPanel>
 
-        <Border DockPanel.Dock="Top"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}"
-                BorderThickness="0,0,0,1"
-                Padding="12,8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}">
             <StackPanel Orientation="Horizontal">
                 <Button Content="Copy all info"
                         Padding="10,3"

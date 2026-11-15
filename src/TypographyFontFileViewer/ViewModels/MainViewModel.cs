@@ -220,9 +220,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial SingleFontPanel CurrentPanel { get; set; } = SingleFontPanel.Preview;
 
-    /// <summary>
-    /// How many panels the strip actually offers. Glyphs and Info arrive in Phase 6.
-    /// </summary>
+    /// <summary>How many panels the strip actually offers.</summary>
     public const int AvailablePanelCount = 3;
 
     [RelayCommand]
@@ -236,8 +234,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// This is what Ctrl+1, Ctrl+3 and Ctrl+4 do, so the numbers still run 1 to 4 across
-    /// the whole window as they did when these were four flat tabs. A panel that has not
-    /// been built yet falls back to Preview rather than leaving an empty strip selected.
+    /// the whole window as they did when these were four flat tabs. A panel past the end
+    /// of the strip falls back to Preview rather than leaving nothing selected.
     /// </remarks>
     [RelayCommand]
     private void ShowPanel(string? panel)
@@ -460,14 +458,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Reads every file's metadata in the background, at low priority.
-    /// </summary>
-    /// <remarks>
-    /// The selected font is read first so its name is right immediately; the rest fill in
-    /// behind it. Collections expand here, because how many faces a file holds is not
-    /// knowable until it has been opened.
-    /// </remarks>
-    /// <summary>
     /// Completes when the background metadata pass for the current folder has finished.
     /// </summary>
     /// <remarks>
@@ -484,6 +474,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         MetadataScanCompleted = RunMetadataScanAsync(scan.Token);
     }
 
+    /// <summary>
+    /// Reads every file's metadata in the background, at low priority.
+    /// </summary>
+    /// <remarks>
+    /// The selected font is read first so its name is right immediately; the rest fill in
+    /// behind it. Collections expand here, because how many faces a file holds is not
+    /// knowable until it has been opened.
+    /// </remarks>
     private async Task RunMetadataScanAsync(CancellationToken cancellationToken)
     {
         try

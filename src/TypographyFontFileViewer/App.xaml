@@ -68,5 +68,13 @@
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="2" />
         </Style>
+
+        <!-- The band of controls across the top of a panel, ruled off from its content. -->
+        <Style x:Key="PanelHeader" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBackground}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
     </Application.Resources>
 </Application>

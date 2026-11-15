@@ -11,11 +11,7 @@
 
     <DockPanel>
 
-        <Border DockPanel.Dock="Top"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}"
-                BorderThickness="0,0,0,1"
-                Padding="12,8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Size" VerticalAlignment="Center" Margin="0,0,8,0" />
 

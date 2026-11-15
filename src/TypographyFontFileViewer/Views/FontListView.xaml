@@ -10,11 +10,7 @@
     <DockPanel>
 
         <!-- Which folder, and how much is in it. -->
-        <Border DockPanel.Dock="Top"
-                Background="{StaticResource PanelBackground}"
-                BorderBrush="{StaticResource PanelBorder}"
-                BorderThickness="0,0,0,1"
-                Padding="10,7">
+        <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}" Padding="10,7">
             <StackPanel>
                 <TextBlock Text="{Binding CurrentFolder}"
                            FontWeight="SemiBold"

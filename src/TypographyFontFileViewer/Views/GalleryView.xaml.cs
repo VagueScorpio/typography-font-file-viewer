@@ -1,5 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using TypographyFontFileViewer.ViewModels;
 
 namespace TypographyFontFileViewer.Views;
 
@@ -21,10 +24,10 @@ public partial class GalleryView : UserControl
     }
 
     /// <summary>Ctrl and the wheel resizes the rows, as it does in the Preview tab.</summary>
-    private void OnGalleryMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    private void OnGalleryMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
-        if (DataContext is not ViewModels.MainViewModel model) return;
+        if (Keyboard.Modifiers != ModifierKeys.Control) return;
+        if (DataContext is not MainViewModel model) return;
 
         model.Gallery.AdjustSize(e.Delta > 0 ? 2 : -2);
         e.Handled = true;
@@ -39,9 +42,9 @@ public partial class GalleryView : UserControl
     /// <summary>Tells the view model how wide a row can show, so it renders no more.</summary>
     private void OnGallerySizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (!e.WidthChanged || DataContext is not ViewModels.MainViewModel model) return;
+        if (!e.WidthChanged || DataContext is not MainViewModel model) return;
 
-        double dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerInchX;
+        double dpi = VisualTreeHelper.GetDpi(this).PixelsPerInchX;
         if (dpi <= 0) dpi = 96;
 
         double usable = GalleryList.ActualWidth
@@ -58,25 +61,11 @@ public partial class GalleryView : UserControl
     /// Only when a row was actually hit: double-clicking the empty space below the last
     /// row, or the scrollbar, should do nothing.
     /// </remarks>
-    private void OnRowDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void OnRowDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source) return;
-        if (FindRow(source) is null) return;
+        if (GalleryList.ContainerFromElement(source) is not ListBoxItem) return;
 
         RowActivated?.Invoke(this, EventArgs.Empty);
-    }
-
-    private static ListBoxItem? FindRow(DependencyObject source)
-    {
-        while (source is not null and not ListBoxItem)
-        {
-            source = source is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
-                ? System.Windows.Media.VisualTreeHelper.GetParent(source)
-                : LogicalTreeHelper.GetParent(source);
-
-            if (source is null) return null;
-        }
-
-        return source as ListBoxItem;
     }
 }
