@@ -271,6 +271,32 @@ public class RenderServiceTests
             "a dark render should be mostly background too — but a dark one");
     }
 
+    /// <summary>
+    /// The background colour reaches the buffer in BGRA order, channel for channel.
+    /// </summary>
+    /// <remarks>
+    /// Both shipping styles are grey — near-black on white, or the reverse — so every
+    /// other test here would pass just as happily with red and blue swapped. This one
+    /// uses a colour whose channels all differ, which is the only way to see it.
+    /// </remarks>
+    [Fact]
+    public async Task TheBackgroundColour_LandsInTheBufferAsBgra()
+    {
+        string path = TestFonts.RequireSystemFont();
+        using var service = new RenderService();
+
+        // Opaque, red 0x11, green 0x22, blue 0x33.
+        var style = new RenderStyle(Foreground: 0xFF000000u, Background: 0xFF112233u);
+
+        RenderedText rendered = await service.RenderTextAsync(
+            FaceKey.For(path, 0), " ", 24, 96, 0, style, cancellationToken: Tests.Cancellation);
+
+        Assert.Equal(0x33, rendered.Bgra[0]);   // blue
+        Assert.Equal(0x22, rendered.Bgra[1]);   // green
+        Assert.Equal(0x11, rendered.Bgra[2]);   // red
+        Assert.Equal(0xFF, rendered.Bgra[3]);   // alpha
+    }
+
     [Fact]
     public async Task MissingGlyphs_AreReportedRatherThanDropped()
     {

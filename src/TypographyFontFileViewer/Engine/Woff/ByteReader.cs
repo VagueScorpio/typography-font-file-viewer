@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using TypographyFontFileViewer.Core;
 
 namespace TypographyFontFileViewer.Engine.Woff;
@@ -43,7 +44,7 @@ internal ref struct ByteReader
     public ushort ReadUInt16()
     {
         Require(2);
-        ushort value = (ushort)((_data[Position] << 8) | _data[Position + 1]);
+        ushort value = BinaryPrimitives.ReadUInt16BigEndian(_data[Position..]);
         Position += 2;
         return value;
     }
@@ -53,10 +54,7 @@ internal ref struct ByteReader
     public uint ReadUInt32()
     {
         Require(4);
-        uint value = ((uint)_data[Position] << 24)
-                   | ((uint)_data[Position + 1] << 16)
-                   | ((uint)_data[Position + 2] << 8)
-                   | _data[Position + 3];
+        uint value = BinaryPrimitives.ReadUInt32BigEndian(_data[Position..]);
         Position += 4;
         return value;
     }

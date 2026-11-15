@@ -118,10 +118,23 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial int AvailableWidthPx { get; set; } = 600;
 
-    /// <summary>The background the preview panel itself should paint.</summary>
-    public Brush PreviewBackground => DarkBackground
-        ? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14))
-        : Brushes.White;
+    /// <summary>
+    /// The background the preview panel itself should paint.
+    /// </summary>
+    /// <remarks>
+    /// Frozen and shared. Bindings read this on every layout pass, and a fresh brush each
+    /// time would be an allocation per read for a colour that never changes.
+    /// </remarks>
+    public Brush PreviewBackground => DarkBackground ? DarkPanel : Brushes.White;
+
+    private static readonly SolidColorBrush DarkPanel = Frozen(Color.FromRgb(0x14, 0x14, 0x14));
+
+    private static SolidColorBrush Frozen(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
 
     private RenderStyle Style => DarkBackground ? RenderStyle.Dark : RenderStyle.Light;
 
@@ -210,17 +223,16 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
         {
             // Superseded by a newer request, which now owns the UI.
         }
-        catch (FontLoadException exception)
-        {
-            MainImage = null;
-            foreach (WaterfallRow row in Waterfall) row.Image = null;
-            ErrorMessage = exception.Message;
-        }
         catch (Exception exception)
         {
             MainImage = null;
             foreach (WaterfallRow row in Waterfall) row.Image = null;
-            ErrorMessage = $"{exception.GetType().Name}: {exception.Message}";
+
+            // A font that will not open explains itself; anything else is a bug, and
+            // saying which kind it was is worth more than a tidy sentence.
+            ErrorMessage = exception is FontLoadException
+                ? exception.Message
+                : $"{exception.GetType().Name}: {exception.Message}";
         }
     }
 

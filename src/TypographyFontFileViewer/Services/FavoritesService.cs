@@ -211,9 +211,9 @@ public sealed class FavoritesService
             string? copyError = CopyIntoPlace(file.Path, targetPath);
             if (copyError is not null) return FavoriteResult.Failed(copyError);
 
-            var companions = new List<string>();
-            if (file.Format == FontFormat.Type1)
-                companions = CopyCompanions(file, targetName);
+            List<string> companions = file.Format == FontFormat.Type1
+                ? CopyCompanions(file, targetName)
+                : [];
 
             var entry = new FavoriteEntry
             {
