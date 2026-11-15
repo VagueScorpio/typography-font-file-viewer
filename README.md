@@ -13,8 +13,10 @@ and run it.
 
 ## Running it
 
-Take `TypographyFontFileViewer.exe` out of `TypographyFontFileViewer-v1.0.zip`, put it
-in a folder you can write to, and double-click it. Nothing is installed, nothing is
+Download `TypographyFontFileViewer-v1.0.zip` from
+[the v1.0 release](https://github.com/VagueScorpio/typography-font-file-viewer/releases/tag/v1.0.0),
+take `TypographyFontFileViewer.exe` out of it, put it in a folder you can write to, and
+double-click it. Nothing is installed, nothing is
 unpacked beside it, and nothing is written to the registry. To remove it, delete the
 exe and the two or three files listed under [Portable files](#portable-files).
 
@@ -22,7 +24,7 @@ Windows SmartScreen will warn about an unsigned exe downloaded from the internet
 **More info** then **Run anyway** gets past it. Building it yourself from this
 repository avoids the warning entirely.
 
-The zip is a build output, not a committed file — `publish.bat` produces the identical
+The zip is a release asset, not a committed file — `publish.bat` produces the identical
 exe from this source. See [Building](#building).
 
 You can also start it with a font file or a folder as the only argument, drag either
