@@ -12,33 +12,11 @@ namespace TypographyFontFileViewer.Tests;
 /// <summary>
 /// Switching between the two views: one font large, or all of them at once.
 /// </summary>
-public class ViewSwitchingTests : IDisposable
+public class ViewSwitchingTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
+    public ViewSwitchingTests() : base("views") { }
 
-    private readonly string _folder = Path.Combine(
-        Path.GetTempPath(), $"tffv-views-{Guid.NewGuid():N}");
-
-    public ViewSwitchingTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true); }
-        catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private void Seed(params string[] names)
-    {
-        string corpus = TestFonts.RequireCorpus();
-
-        foreach (string name in names)
-        {
-            string source = Path.Combine(corpus, name);
-            if (!File.Exists(source)) Assert.Skip($"{name} is not in the corpus.");
-            File.Copy(source, Path.Combine(_folder, name), overwrite: true);
-        }
-    }
+    private void Seed(params string[] names) => SeedCorpusFonts(Root, names);
 
     [Fact]
     public void TheAppOpensOnTheSingleFontView()
@@ -91,7 +69,7 @@ public class ViewSwitchingTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         model.CurrentView = ViewMode.Gallery;
 
         FontItemViewModel wanted = model.Fonts[2];
@@ -123,7 +101,7 @@ public class ViewSwitchingTests : IDisposable
 
         using var service = new RenderService();
         using var model = new MainViewModel(service);
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         double preview = model.Preview.PointSize;
         double gallery = model.Gallery.GallerySize;
@@ -145,7 +123,7 @@ public class ViewSwitchingTests : IDisposable
 
         using var service = new RenderService();
         using var model = new MainViewModel(service);
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         model.NextFontCommand.Execute(null);
         FontItemViewModel selected = model.SelectedFont!;

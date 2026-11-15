@@ -9,39 +9,15 @@ namespace TypographyFontFileViewer.Tests;
 /// Phase 3 acceptance: opening one font loads its whole folder with that font selected,
 /// and the navigation commands walk the list from end to end.
 /// </summary>
-public class MainViewModelTests : IDisposable
+public class MainViewModelTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(
-        Path.GetTempPath(), $"tffv-vm-{Guid.NewGuid():N}");
-
-    public MainViewModelTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true); }
-        catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
+    public MainViewModelTests() : base("vm") { }
 
     /// <summary>Copies a few real fonts into a folder of this test's own.</summary>
     private List<string> SeedFonts(params string[] names)
     {
-        string corpus = TestFonts.RequireCorpus();
-        var copied = new List<string>();
-
-        foreach (string name in names)
-        {
-            string source = Path.Combine(corpus, name);
-            if (!File.Exists(source)) Assert.Skip($"{name} is not in the corpus.");
-
-            string target = Path.Combine(_folder, name);
-            File.Copy(source, target, overwrite: true);
-            copied.Add(target);
-        }
-
-        return copied;
+        SeedCorpusFonts(Root, names);
+        return [.. names.Select(name => Path.Combine(Root, name))];
     }
 
     [Fact]
@@ -56,7 +32,7 @@ public class MainViewModelTests : IDisposable
         await model.OpenPathAsync(fonts[1], TestCancellation);   // open Inter-Bold
 
         Assert.Equal(4, model.Fonts.Count);
-        Assert.Equal(_folder, model.CurrentFolder);
+        Assert.Equal(Root, model.CurrentFolder);
         Assert.NotNull(model.SelectedFont);
         Assert.Equal("Inter-Bold.ttf", model.SelectedFont!.File.FileName);
 
@@ -73,7 +49,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         Assert.Equal(2, model.Fonts.Count);
         Assert.Equal("Inter-Bold.ttf", model.SelectedFont!.File.FileName);   // natural order
@@ -87,7 +63,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         // Before the pass, a row knows only what the directory entry said.
         Assert.All(model.Fonts, font => Assert.EndsWith(
@@ -114,7 +90,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         Assert.Single(model.Fonts);          // one file, so one row to begin with
 
         await model.MetadataScanCompleted;
@@ -133,12 +109,12 @@ public class MainViewModelTests : IDisposable
     public async Task ABrokenFont_GetsARowWithItsError()
     {
         SeedFonts("Inter-Regular.ttf");
-        File.WriteAllBytes(Path.Combine(_folder, "Broken.ttf"), [1, 2, 3, 4, 5, 6, 7, 8]);
+        File.WriteAllBytes(Path.Combine(Root, "Broken.ttf"), [1, 2, 3, 4, 5, 6, 7, 8]);
 
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         await model.MetadataScanCompleted;
 
         FontItemViewModel broken = model.Fonts.Single(font => font.File.FileName == "Broken.ttf");
@@ -155,12 +131,12 @@ public class MainViewModelTests : IDisposable
     [Fact]
     public async Task SelectingABrokenFont_ClearsThePreviewInsteadOfFailing()
     {
-        File.WriteAllBytes(Path.Combine(_folder, "Broken.ttf"), [9, 9, 9, 9]);
+        File.WriteAllBytes(Path.Combine(Root, "Broken.ttf"), [9, 9, 9, 9]);
 
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         await model.MetadataScanCompleted;
 
         model.SelectedFont = model.Fonts[0];
@@ -180,7 +156,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         int count = model.Fonts.Count;
         Assert.Equal(5, count);
 
@@ -208,7 +184,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         model.PreviousFontCommand.Execute(null);
         Assert.Equal(model.Fonts[0], model.SelectedFont);
@@ -229,7 +205,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         model.NextFontCommand.Execute(null);
         model.PreviousFontCommand.Execute(null);
@@ -247,7 +223,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         await model.MetadataScanCompleted;
 
         Assert.Equal("Font 1 of 3", model.SelectedPosition);
@@ -266,7 +242,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(Path.Combine(_folder, "nowhere.ttf"), TestCancellation);
+        await model.OpenPathAsync(Path.Combine(Root, "nowhere.ttf"), TestCancellation);
 
         Assert.Empty(model.Fonts);
         Assert.False(string.IsNullOrWhiteSpace(model.Message));
@@ -280,7 +256,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         Assert.Single(model.Fonts);
 
         SeedFonts("NotoSans-Regular.ttf");
@@ -298,7 +274,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         model.LastFontCommand.Execute(null);
         string selected = model.SelectedFont!.File.FileName;
 
@@ -317,7 +293,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
 
         model.Preview.PreviewText = "Rendering";
         model.Preview.PointSize = 36;
@@ -337,7 +313,7 @@ public class MainViewModelTests : IDisposable
         using var service = new RenderService();
         using var model = new MainViewModel(service);
 
-        await model.OpenPathAsync(_folder, TestCancellation);
+        await model.OpenPathAsync(Root, TestCancellation);
         await model.MetadataScanCompleted;
 
         // Give the fixed-size lookup a moment; it is fired off with the selection.

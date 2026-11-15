@@ -12,17 +12,8 @@ namespace TypographyFontFileViewer.Tests;
 public class FontEngineTests
 {
     /// <summary>The runner's token, so a wedged test can actually be cancelled.</summary>
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
     private const string SampleText = "Hamburgefonstiv 123";
-
-    private static int CountInkPixels(byte[] bgra)
-    {
-        int ink = 0;
-        for (int i = 0; i < bgra.Length; i += 4)
-            if (bgra[i] < 200) ink++;
-        return ink;
-    }
 
     // --- Opening every font ----------------------------------------------------
 
@@ -37,7 +28,7 @@ public class FontEngineTests
 
         foreach (string path in fonts)
         {
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
             if (summaries.Length == 0)
             {
@@ -64,7 +55,7 @@ public class FontEngineTests
 
         foreach (string path in fonts)
         {
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
             foreach (FaceSummary summary in summaries)
                 if (!summary.IsBroken && string.IsNullOrWhiteSpace(summary.Family))
                     nameless.Add($"{Path.GetFileName(path)} face {summary.FaceIndex}");
@@ -85,13 +76,13 @@ public class FontEngineTests
 
         foreach (string path in fonts)
         {
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
             FaceSummary summary = summaries[0];
             if (summary.IsBroken) continue;
 
             var key = FaceKey.For(path, summary.FaceIndex);
             RenderedText rendered = await service.RenderTextAsync(
-                key, SampleText, pointSize: 24, dpi: 96, maxWidthPx: 0, RenderStyle.Light, cancellationToken: TestCancellation);
+                key, SampleText, pointSize: 24, dpi: 96, maxWidthPx: 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
             if (rendered.Width <= 0 || rendered.Height <= 0)
             {
@@ -99,7 +90,7 @@ public class FontEngineTests
                 continue;
             }
 
-            int ink = CountInkPixels(rendered.Bgra);
+            int ink = Tests.CountInkPixels(rendered.Bgra);
             if (ink < 20) blank.Add($"{Path.GetFileName(path)}: only {ink} ink pixels");
         }
 
@@ -115,7 +106,7 @@ public class FontEngineTests
         string path = TestFonts.Require("TestCollection.ttc");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(2, summaries.Length);
         Assert.All(summaries, summary =>
@@ -139,9 +130,9 @@ public class FontEngineTests
         using var service = new RenderService();
 
         RenderedText first = await service.RenderTextAsync(
-            FaceKey.For(path, 0), "Weight", 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), "Weight", 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
         RenderedText second = await service.RenderTextAsync(
-            FaceKey.For(path, 1), "Weight", 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 1), "Weight", 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         // Regular and Bold of the same family must not produce identical pixels.
         Assert.False(first.Bgra.AsSpan().SequenceEqual(second.Bgra),
@@ -162,7 +153,7 @@ public class FontEngineTests
         string path = TestFonts.Require("TestSuitcase.dfont");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(2, summaries.Length);
         Assert.All(summaries, summary =>
@@ -186,13 +177,13 @@ public class FontEngineTests
 
         RenderedText rendered = await service.RenderTextAsync(
             FaceKey.For(path, 0), "Suitcase", 32, 96, 0, RenderStyle.Light,
-            cancellationToken: TestCancellation);
+            cancellationToken: Tests.Cancellation);
 
         // Counting dark pixels alone would pass on a row of .notdef boxes, so compare
         // two different strings: a real face draws them differently.
         RenderedText other = await service.RenderTextAsync(
             FaceKey.For(path, 0), "iiiiiiii", 32, 96, 0, RenderStyle.Light,
-            cancellationToken: TestCancellation);
+            cancellationToken: Tests.Cancellation);
 
         Assert.True(rendered.Width > 0 && rendered.Height > 0);
         Assert.False(rendered.Bgra.AsSpan().SequenceEqual(other.Bgra),
@@ -206,7 +197,7 @@ public class FontEngineTests
         if (path is null) Assert.Skip("cambria.ttc is not installed.");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path!, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path!, cancellationToken: Tests.Cancellation);
 
         Assert.True(summaries.Length >= 2, $"Expected several faces, got {summaries.Length}.");
         Assert.All(summaries, summary => Assert.False(summary.IsBroken, summary.Error));
@@ -220,7 +211,7 @@ public class FontEngineTests
         string path = TestFonts.Require("Inter-Regular.ttf");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.Single(summaries);
         Assert.Contains("Inter", summaries[0].Family, StringComparison.OrdinalIgnoreCase);
@@ -234,7 +225,7 @@ public class FontEngineTests
         string path = TestFonts.Require("Inter-Regular.ttf");
 
         using var service = new RenderService();
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: Tests.Cancellation);
 
         Assert.Equal("TrueType", info.OutlineFormat);
         Assert.Contains("Inter", info.Family ?? "", StringComparison.OrdinalIgnoreCase);
@@ -252,7 +243,7 @@ public class FontEngineTests
         string path = TestFonts.Require("SourceSerif4-Regular.otf");
 
         using var service = new RenderService();
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: Tests.Cancellation);
 
         Assert.Equal("CFF", info.OutlineFormat);
         Assert.False(string.IsNullOrWhiteSpace(info.PostScriptName));
@@ -264,8 +255,8 @@ public class FontEngineTests
         string path = TestFonts.Require("Inter[opsz,wght].ttf");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: Tests.Cancellation);
 
         Assert.True(summaries[0].IsVariable);
         Assert.True(info.IsVariable);
@@ -289,20 +280,20 @@ public class FontEngineTests
             ?? TestFonts.Require("NimbusRoman-Regular.pfa");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.False(summaries[0].IsBroken, summaries[0].Error);
         Assert.Equal(FontFormat.Type1, summaries[0].Format);
         Assert.False(string.IsNullOrWhiteSpace(summaries[0].Family));
 
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(path, 0), cancellationToken: Tests.Cancellation);
         Assert.Equal("Type 1", info.OutlineFormat);
 
         // Type 1 is not SFNT, so this exercises the FreeType fallback shaping path.
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, 0), "AVWA Type 1", 36, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), "AVWA Type 1", 36, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
-        Assert.True(CountInkPixels(rendered.Bgra) > 50);
+        Assert.True(Tests.CountInkPixels(rendered.Bgra) > 50);
     }
 
     // --- Bitmap fonts ----------------------------------------------------------
@@ -319,7 +310,7 @@ public class FontEngineTests
         string path = fonts[0];
         using var service = new RenderService();
 
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
         FaceSummary summary = summaries[0];
 
         Assert.False(summary.IsBroken, summary.Error);
@@ -328,10 +319,10 @@ public class FontEngineTests
 
         // Ask for a size the font certainly does not have; it must snap to one it does.
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, summary.FaceIndex), "Bitmap", 41, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, summary.FaceIndex), "Bitmap", 41, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(rendered.Width > 0 && rendered.Height > 0);
-        Assert.True(CountInkPixels(rendered.Bgra) > 20,
+        Assert.True(Tests.CountInkPixels(rendered.Bgra) > 20,
             $"{Path.GetFileName(path)} rendered no ink at a size it had to snap.");
     }
 
@@ -358,11 +349,11 @@ public class FontEngineTests
         var key = FaceKey.For(fonts[0], 0);
 
         RenderedText first = await service.RenderTextAsync(
-            key, "AAAA", 12, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, "AAAA", 12, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
         RenderedText second = await service.RenderTextAsync(
-            key, "WWWW", 12, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, "WWWW", 12, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
-        Assert.True(CountInkPixels(first.Bgra) > 4, "nothing was drawn at all");
+        Assert.True(Tests.CountInkPixels(first.Bgra) > 4, "nothing was drawn at all");
         Assert.False(
             first.Width == second.Width && first.Bgra.AsSpan().SequenceEqual(second.Bgra),
             $"{Path.GetFileName(fonts[0])} drew 'AAAA' and 'WWWW' identically, which means "
@@ -380,7 +371,7 @@ public class FontEngineTests
 
         // Every one of these is a distinct glyph in any reasonable text font.
         IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(
-            key, cancellationToken: TestCancellation);
+            key, cancellationToken: Tests.Cancellation);
 
         Assert.NotEmpty(glyphs);
 
@@ -403,7 +394,7 @@ public class FontEngineTests
         if (fonts.Count == 0) Assert.Skip("No .pcf font in the corpus.");
 
         using var service = new RenderService();
-        IReadOnlyList<int> sizes = await service.ReadFixedSizesAsync(FaceKey.For(fonts[0], 0), cancellationToken: TestCancellation);
+        IReadOnlyList<int> sizes = await service.ReadFixedSizesAsync(FaceKey.For(fonts[0], 0), cancellationToken: Tests.Cancellation);
 
         Assert.NotEmpty(sizes);
         Assert.All(sizes, size => Assert.InRange(size, 1, 512));
@@ -420,11 +411,11 @@ public class FontEngineTests
         using var service = new RenderService();
         var key = FaceKey.For(path!, 0);
 
-        FontInfo info = await service.ReadInfoAsync(key, cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(key, cancellationToken: Tests.Cancellation);
         Assert.True(info.HasColor, "Segoe UI Emoji should report colour glyphs");
 
         RenderedText rendered = await service.RenderTextAsync(
-            key, "\U0001F600\U0001F680", 48, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, "\U0001F600\U0001F680", 48, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         // Colour glyphs must come out coloured, not as flat silhouettes: look for a
         // pixel whose channels differ from one another.
@@ -449,7 +440,7 @@ public class FontEngineTests
         using var service = new RenderService();
         var key = FaceKey.For(path!, 0);
 
-        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: TestCancellation);
+        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: Tests.Cancellation);
 
         Assert.True(glyphs.Count > 10_000, $"Expected a large glyph set, got {glyphs.Count}.");
         Assert.All(glyphs.Take(200), glyph => Assert.True(glyph.IsMapped));

@@ -12,15 +12,6 @@ namespace TypographyFontFileViewer.Tests;
 public class RenderServiceTests
 {
     /// <summary>The runner's token, so a wedged test can actually be cancelled.</summary>
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private static int CountInkPixels(byte[] bgra)
-    {
-        int ink = 0;
-        for (int i = 0; i < bgra.Length; i += 4)
-            if (bgra[i] < 200) ink++;
-        return ink;
-    }
 
     private static string WriteTempFile(string extension, byte[] contents)
     {
@@ -43,8 +34,8 @@ public class RenderServiceTests
             var key = FaceKey.For(copy, 0);
 
             RenderedText rendered = await service.RenderTextAsync(
-                key, "Still open", 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
-            Assert.True(CountInkPixels(rendered.Bgra) > 20);
+                key, "Still open", 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
+            Assert.True(Tests.CountInkPixels(rendered.Bgra) > 20);
 
             // The favourites design rests on this: delete the font while it is on screen.
             File.Delete(copy);
@@ -52,8 +43,8 @@ public class RenderServiceTests
 
             // And the cached face still renders afterwards, from memory.
             RenderedText again = await service.RenderTextAsync(
-                key, "Still open", 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
-            Assert.True(CountInkPixels(again.Bgra) > 20);
+                key, "Still open", 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
+            Assert.True(Tests.CountInkPixels(again.Bgra) > 20);
         }
         finally
         {
@@ -70,7 +61,7 @@ public class RenderServiceTests
         try
         {
             using var service = new RenderService();
-            await service.RenderTextAsync(FaceKey.For(copy, 0), "Open", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            await service.RenderTextAsync(FaceKey.For(copy, 0), "Open", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
             // Overwriting in place is what an installer or a sync client does.
             File.WriteAllBytes(copy, File.ReadAllBytes(source));
@@ -93,7 +84,7 @@ public class RenderServiceTests
         try
         {
             using var service = new RenderService();
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
             FaceSummary summary = Assert.Single(summaries);
             Assert.True(summary.IsBroken);
@@ -116,7 +107,7 @@ public class RenderServiceTests
         try
         {
             using var service = new RenderService();
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
             Assert.True(Assert.Single(summaries).IsBroken);
         }
@@ -132,7 +123,7 @@ public class RenderServiceTests
         string path = Path.Combine(Path.GetTempPath(), $"tffv-gone-{Guid.NewGuid():N}.ttf");
 
         using var service = new RenderService();
-        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+        FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.True(Assert.Single(summaries).IsBroken);
     }
@@ -147,14 +138,14 @@ public class RenderServiceTests
         try
         {
             using var service = new RenderService();
-            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: Tests.Cancellation);
 
             // Either it fails cleanly or FreeType salvages it; what it must not do is
             // crash, hang, or hand back a face that cannot render.
             foreach (FaceSummary summary in summaries.Where(s => !s.IsBroken))
             {
                 RenderedText rendered = await service.RenderTextAsync(
-                    FaceKey.For(path, summary.FaceIndex), "Test", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+                    FaceKey.For(path, summary.FaceIndex), "Test", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
                 Assert.True(rendered.Width > 0);
             }
         }
@@ -172,7 +163,7 @@ public class RenderServiceTests
         using var service = new RenderService();
 
         await Assert.ThrowsAsync<FontLoadException>(() => service.RenderTextAsync(
-            new FaceKey(path, 0, 1024, DateTime.UtcNow), "Test", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation));
+            new FaceKey(path, 0, 1024, DateTime.UtcNow), "Test", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation));
     }
 
     [Fact]
@@ -185,10 +176,10 @@ public class RenderServiceTests
         {
             using var service = new RenderService();
 
-            Assert.True((await service.ReadSummariesAsync(bad, cancellationToken: TestCancellation))[0].IsBroken);
+            Assert.True((await service.ReadSummariesAsync(bad, cancellationToken: Tests.Cancellation))[0].IsBroken);
 
             // The engine thread survived, and the very next request works.
-            FaceSummary[] summaries = await service.ReadSummariesAsync(good, cancellationToken: TestCancellation);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(good, cancellationToken: Tests.Cancellation);
             Assert.False(summaries[0].IsBroken);
         }
         finally
@@ -210,9 +201,9 @@ public class RenderServiceTests
             "The quick brown fox jumps over the lazy dog, again and again and again.";
 
         RenderedText wide = await service.RenderTextAsync(
-            key, Paragraph, 20, 96, 2000, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, Paragraph, 20, 96, 2000, RenderStyle.Light, cancellationToken: Tests.Cancellation);
         RenderedText narrow = await service.RenderTextAsync(
-            key, Paragraph, 20, 96, 240, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, Paragraph, 20, 96, 240, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(1, wide.LineCount);
         Assert.True(narrow.LineCount > 1, "narrow text should wrap");
@@ -227,7 +218,7 @@ public class RenderServiceTests
         using var service = new RenderService();
 
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, 0), "one\ntwo\nthree", 20, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), "one\ntwo\nthree", 20, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(3, rendered.LineCount);
     }
@@ -239,10 +230,10 @@ public class RenderServiceTests
         using var service = new RenderService();
 
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, 0), "Supercalifragilisticexpialidocious", 32, 96, 100, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), "Supercalifragilisticexpialidocious", 32, 96, 100, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(rendered.LineCount > 1, "an over-long word should break across lines");
-        Assert.True(CountInkPixels(rendered.Bgra) > 50, "and still be drawn");
+        Assert.True(Tests.CountInkPixels(rendered.Bgra) > 50, "and still be drawn");
     }
 
     [Fact]
@@ -252,10 +243,10 @@ public class RenderServiceTests
         using var service = new RenderService();
 
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, 0), "   ", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), "   ", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(rendered.Width > 0 && rendered.Height > 0);
-        Assert.Equal(0, CountInkPixels(rendered.Bgra));
+        Assert.Equal(0, Tests.CountInkPixels(rendered.Bgra));
     }
 
     [Fact]
@@ -265,8 +256,8 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        RenderedText light = await service.RenderTextAsync(key, "Contrast", 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
-        RenderedText dark = await service.RenderTextAsync(key, "Contrast", 32, 96, 0, RenderStyle.Dark, cancellationToken: TestCancellation);
+        RenderedText light = await service.RenderTextAsync(key, "Contrast", 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
+        RenderedText dark = await service.RenderTextAsync(key, "Contrast", 32, 96, 0, RenderStyle.Dark, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(light.Width, dark.Width);
         Assert.Equal(light.Height, dark.Height);
@@ -274,9 +265,9 @@ public class RenderServiceTests
         // "Ink" here means a dark pixel. On a white background only the strokes are
         // dark; on a near-black background almost everything is.
         int pixelCount = light.Bgra.Length / 4;
-        Assert.True(CountInkPixels(light.Bgra) < pixelCount / 2,
+        Assert.True(Tests.CountInkPixels(light.Bgra) < pixelCount / 2,
             "a light render should be mostly background");
-        Assert.True(CountInkPixels(dark.Bgra) > pixelCount / 2,
+        Assert.True(Tests.CountInkPixels(dark.Bgra) > pixelCount / 2,
             "a dark render should be mostly background too — but a dark one");
     }
 
@@ -292,7 +283,7 @@ public class RenderServiceTests
         string privateUse = char.ConvertFromUtf32(0xE000) + char.ConvertFromUtf32(0xE001);
 
         RenderedText rendered = await service.RenderTextAsync(
-            FaceKey.For(path, 0), privateUse, 32, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+            FaceKey.For(path, 0), privateUse, 32, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(rendered.HasMissingGlyphs);
         Assert.True(rendered.GlyphCount > 0, "missing characters still occupy glyph slots");
@@ -312,8 +303,8 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        RenderedText at96 = await service.RenderTextAsync(key, "Size", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
-        RenderedText at192 = await service.RenderTextAsync(key, "Size", 24, 192, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+        RenderedText at96 = await service.RenderTextAsync(key, "Size", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
+        RenderedText at192 = await service.RenderTextAsync(key, "Size", 24, 192, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         // Twice the DPI is twice the pixels, give or take rounding and padding.
         Assert.InRange(at192.Height, at96.Height * 3 / 2, at96.Height * 5 / 2);
@@ -327,7 +318,7 @@ public class RenderServiceTests
         string path = TestFonts.RequireSystemFont();
         using var service = new RenderService();
 
-        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(FaceKey.For(path, 0), cancellationToken: TestCancellation);
+        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(FaceKey.For(path, 0), cancellationToken: Tests.Cancellation);
 
         Assert.True(glyphs.Count > 100);
         Assert.All(glyphs, glyph => Assert.True(glyph.IsMapped));
@@ -344,8 +335,8 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        IReadOnlyList<GlyphEntry> mapped = await service.ListGlyphsAsync(key, includeUnmapped: false, cancellationToken: TestCancellation);
-        IReadOnlyList<GlyphEntry> all = await service.ListGlyphsAsync(key, includeUnmapped: true, cancellationToken: TestCancellation);
+        IReadOnlyList<GlyphEntry> mapped = await service.ListGlyphsAsync(key, includeUnmapped: false, cancellationToken: Tests.Cancellation);
+        IReadOnlyList<GlyphEntry> all = await service.ListGlyphsAsync(key, includeUnmapped: true, cancellationToken: Tests.Cancellation);
 
         Assert.True(all.Count >= mapped.Count);
         if (all.Count > mapped.Count)
@@ -359,12 +350,12 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: TestCancellation);
+        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: Tests.Cancellation);
         var sample = glyphs.Where(g => g.Codepoint is >= 'A' and <= 'Z').Take(8).ToList();
         Assert.NotEmpty(sample);
 
         GlyphCellBitmap[] cells = await service.RenderGlyphCellsAsync(
-            key, sample, cellPx: 64, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, sample, cellPx: 64, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.Equal(sample.Count, cells.Length);
         Assert.All(cells, cell =>
@@ -373,7 +364,7 @@ public class RenderServiceTests
             Assert.Equal(64, cell.Height);
             Assert.Equal(64 * 64 * 4, cell.Bgra.Length);
             Assert.False(cell.IsBlank);
-            Assert.True(CountInkPixels(cell.Bgra) > 10);
+            Assert.True(Tests.CountInkPixels(cell.Bgra) > 10);
         });
     }
 
@@ -384,11 +375,11 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: TestCancellation);
+        IReadOnlyList<GlyphEntry> glyphs = await service.ListGlyphsAsync(key, cancellationToken: Tests.Cancellation);
         GlyphEntry space = glyphs.First(g => g.Codepoint == ' ');
 
         GlyphCellBitmap[] cells = await service.RenderGlyphCellsAsync(
-            key, [space], cellPx: 48, RenderStyle.Light, cancellationToken: TestCancellation);
+            key, [space], cellPx: 48, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(cells[0].IsBlank);
     }
@@ -402,11 +393,11 @@ public class RenderServiceTests
         using var service = new RenderService();
         var key = FaceKey.For(path, 0);
 
-        await service.RenderTextAsync(key, "First", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+        await service.RenderTextAsync(key, "First", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
         int hitsAfterFirst = service.CacheStatistics.Hits;
 
-        await service.RenderTextAsync(key, "Second", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
-        await service.RenderTextAsync(key, "Third", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+        await service.RenderTextAsync(key, "Second", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
+        await service.RenderTextAsync(key, "Third", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
 
         Assert.True(service.CacheStatistics.Hits > hitsAfterFirst,
             "repeat requests for one face should be served from the cache");
@@ -419,10 +410,10 @@ public class RenderServiceTests
         string path = TestFonts.RequireSystemFont();
         using var service = new RenderService();
 
-        await service.RenderTextAsync(FaceKey.For(path, 0), "Cached", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+        await service.RenderTextAsync(FaceKey.For(path, 0), "Cached", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
         Assert.True(service.CacheStatistics.Count >= 1);
 
-        int dropped = await service.InvalidateAsync(path, cancellationToken: TestCancellation);
+        int dropped = await service.InvalidateAsync(path, cancellationToken: Tests.Cancellation);
 
         Assert.True(dropped >= 1);
         Assert.Equal(0, service.CacheStatistics.Count);
@@ -444,7 +435,7 @@ public class RenderServiceTests
             {
                 string copy = WriteTempFile(".ttf", bytes);
                 copies.Add(copy);
-                await service.RenderTextAsync(FaceKey.For(copy, 0), "Evict", 20, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation);
+                await service.RenderTextAsync(FaceKey.For(copy, 0), "Evict", 20, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation);
             }
 
             Assert.True(service.CacheStatistics.Count <= 1,
@@ -485,7 +476,7 @@ public class RenderServiceTests
         {
             requests.Add(service.RenderTextAsync(
                 key, $"Burst {i}", 18 + (i % 12), 96, 0, RenderStyle.Light,
-                i % 2 == 0 ? JobPriority.High : JobPriority.Low, cancellationToken: TestCancellation));
+                i % 2 == 0 ? JobPriority.High : JobPriority.Low, cancellationToken: Tests.Cancellation));
         }
 
         RenderedText[] results = await Task.WhenAll(requests);
@@ -512,6 +503,6 @@ public class RenderServiceTests
         service.Dispose();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() => service.RenderTextAsync(
-            FaceKey.For(path, 0), "Too late", 24, 96, 0, RenderStyle.Light, cancellationToken: TestCancellation));
+            FaceKey.For(path, 0), "Too late", 24, 96, 0, RenderStyle.Light, cancellationToken: Tests.Cancellation));
     }
 }

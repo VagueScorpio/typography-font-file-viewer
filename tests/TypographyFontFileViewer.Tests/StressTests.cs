@@ -22,26 +22,9 @@ namespace TypographyFontFileViewer.Tests;
 /// real folders of real fonts and work them hard.
 /// </para>
 /// </remarks>
-public class StressTests : IDisposable
+public class StressTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-stress-{Guid.NewGuid():N}");
-
-    public StressTests() => Directory.CreateDirectory(_root);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private string Folder(string name)
-    {
-        string path = Path.Combine(_root, name);
-        Directory.CreateDirectory(path);
-        return path;
-    }
+    public StressTests() : base("stress") { }
 
     private static byte[] RealFont(string name = "Inter-Regular.ttf")
     {
@@ -357,7 +340,7 @@ public class StressTests : IDisposable
     [Fact]
     public async Task AVeryLongPath_IsHandled()
     {
-        string deep = _root;
+        string deep = Root;
         for (int i = 0; i < 12; i++)
             deep = Path.Combine(deep, new string((char)('a' + i), 24));
 

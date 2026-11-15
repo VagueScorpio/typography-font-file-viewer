@@ -28,23 +28,13 @@ internal sealed class RecordingRecycler : IFileRecycler
     }
 }
 
-public class HashServiceTests : IDisposable
+public class HashServiceTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), $"tffv-hash-{Guid.NewGuid():N}");
-
-    public HashServiceTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
+    public HashServiceTests() : base("hash") { }
 
     private string Write(string name, string contents)
     {
-        string path = Path.Combine(_folder, name);
+        string path = Path.Combine(Root, name);
         File.WriteAllText(path, contents);
         return path;
     }
@@ -96,7 +86,7 @@ public class HashServiceTests : IDisposable
     {
         var hashes = new HashService();
         Assert.Null(await hashes.ComputeAsync(
-            Path.Combine(_folder, "nowhere.ttf"), TestCancellation));
+            Path.Combine(Root, "nowhere.ttf"), TestCancellation));
     }
 
     [Fact]
@@ -112,19 +102,11 @@ public class HashServiceTests : IDisposable
     }
 }
 
-public class SettingsServiceTests : IDisposable
+public class SettingsServiceTests : TempFolderTest
 {
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), $"tffv-settings-{Guid.NewGuid():N}");
+    public SettingsServiceTests() : base("settings") { }
 
-    public SettingsServiceTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private string Path_ => System.IO.Path.Combine(_folder, "TypographyFontFileViewer.json");
+    private string Path_ => System.IO.Path.Combine(Root, "TypographyFontFileViewer.json");
 
     [Fact]
     public void SettingsSurviveARoundTrip()
@@ -205,30 +187,20 @@ public class SettingsServiceTests : IDisposable
 /// Phase 5 acceptance: favouriting copies the file next to the exe, un-favouriting sends
 /// that copy to the Recycle Bin, and the stars stay right across restarts and renames.
 /// </summary>
-public class FavoritesServiceTests : IDisposable
+public class FavoritesServiceTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-fav-{Guid.NewGuid():N}");
     private readonly string _source;
     private readonly string _favorites;
 
-    public FavoritesServiceTests()
+    public FavoritesServiceTests() : base("fav")
     {
-        _source = Path.Combine(_root, "source");
-        _favorites = Path.Combine(_root, "Favorite Fonts");
-        Directory.CreateDirectory(_source);
-    }
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
+        _source = Folder("source");
+        _favorites = Path.Combine(Root, "Favorite Fonts");
     }
 
     private (FavoritesService Service, RecordingRecycler Recycler, SettingsService Settings) Build()
     {
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         settings.Load();
 
         var recycler = new RecordingRecycler();
@@ -546,10 +518,10 @@ public class FavoritesServiceTests : IDisposable
     public async Task AFolderThatCannotBeCreated_SaysSoPlainly()
     {
         // A folder cannot live inside a file, so this stands in for Program Files.
-        string blocker = Path.Combine(_root, "blocker");
+        string blocker = Path.Combine(Root, "blocker");
         File.WriteAllText(blocker, "not a directory");
 
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         var service = new FavoritesService(
             Path.Combine(blocker, "Favorite Fonts"),
             new HashService(), new RecordingRecycler(), settings);
@@ -601,8 +573,8 @@ public class FavoritesServiceTests : IDisposable
     [Fact]
     public void TheRealRecycler_RemovesAFileFromDisk()
     {
-        string path = Path.Combine(_root, $"tffv-recyclebin-test-{Guid.NewGuid():N}.ttf");
-        Directory.CreateDirectory(_root);
+        string path = Path.Combine(Root, $"tffv-recyclebin-test-{Guid.NewGuid():N}.ttf");
+        Directory.CreateDirectory(Root);
         File.WriteAllText(path, "this goes to the Recycle Bin");
 
         string? error = new RecycleBinFileRecycler().Recycle(path);
@@ -614,49 +586,29 @@ public class FavoritesServiceTests : IDisposable
     [Fact]
     public void TheRealRecycler_IsHappyWithAFileThatHasAlreadyGone()
     {
-        string path = Path.Combine(_root, "never-existed.ttf");
+        string path = Path.Combine(Root, "never-existed.ttf");
         Assert.Null(new RecycleBinFileRecycler().Recycle(path));
     }
 }
 
 /// <summary>Favourites as the user meets them: stars in the list, Ctrl+D, the folder.</summary>
-public class FavoritesInTheAppTests : IDisposable
+public class FavoritesInTheAppTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-favapp-{Guid.NewGuid():N}");
     private readonly string _fonts;
     private readonly string _favorites;
 
-    public FavoritesInTheAppTests()
+    public FavoritesInTheAppTests() : base("favapp")
     {
-        _fonts = Path.Combine(_root, "fonts");
-        _favorites = Path.Combine(_root, "Favorite Fonts");
-        Directory.CreateDirectory(_fonts);
+        _fonts = Folder("fonts");
+        _favorites = Path.Combine(Root, "Favorite Fonts");
     }
 
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private void Seed(params string[] names)
-    {
-        string corpus = TestFonts.RequireCorpus();
-
-        foreach (string name in names)
-        {
-            string source = Path.Combine(corpus, name);
-            if (!File.Exists(source)) Assert.Skip($"{name} is not in the corpus.");
-            File.Copy(source, Path.Combine(_fonts, name), overwrite: true);
-        }
-    }
+    private void Seed(params string[] names) => SeedCorpusFonts(_fonts, names);
 
     private (MainViewModel Model, FavoritesService Favorites, RecordingRecycler Recycler, RenderService Render)
         Build()
     {
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         settings.Load();
 
         var recycler = new RecordingRecycler();
@@ -756,7 +708,7 @@ public class FavoritesInTheAppTests : IDisposable
             await model.ToggleFavoriteCommand.ExecuteAsync(null);
 
             // The same bytes under a different name, somewhere else entirely.
-            string elsewhere = Path.Combine(_root, "elsewhere");
+            string elsewhere = Path.Combine(Root, "elsewhere");
             Directory.CreateDirectory(elsewhere);
             File.Copy(
                 Path.Combine(_fonts, "Inter-Regular.ttf"),

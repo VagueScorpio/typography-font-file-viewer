@@ -109,21 +109,9 @@ public class RenderedBitmapCacheTests
 /// Phase 4 acceptance: a folder of a thousand fonts renders row by row without the
 /// memory or the queue growing without limit.
 /// </summary>
-public class GalleryViewModelTests : IDisposable
+public class GalleryViewModelTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(
-        Path.GetTempPath(), $"tffv-gallery-{Guid.NewGuid():N}");
-
-    public GalleryViewModelTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true); }
-        catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
+    public GalleryViewModelTests() : base("gallery") { }
 
     private List<string> SeedCopies(int count)
     {
@@ -135,7 +123,7 @@ public class GalleryViewModelTests : IDisposable
 
         for (int i = 0; i < count; i++)
         {
-            string path = Path.Combine(_folder, $"Font{i:D4}.ttf");
+            string path = Path.Combine(Root, $"Font{i:D4}.ttf");
             File.WriteAllBytes(path, bytes);
             paths.Add(path);
         }

@@ -12,7 +12,6 @@ namespace TypographyFontFileViewer.Tests;
 /// </summary>
 public class GlyphMapViewModelTests
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
     private static (GlyphMapViewModel Map, PreviewViewModel Preview, RenderService Render) Build()
     {
@@ -197,11 +196,11 @@ public class GlyphMapViewModelTests
 
             GlyphEntry glyph = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == 'A');
 
-            var first = await map.RenderCellAsync(glyph, TestCancellation);
+            var first = await map.RenderCellAsync(glyph, Tests.Cancellation);
             Assert.NotNull(first);
             Assert.True(first!.IsFrozen);
 
-            var second = await map.RenderCellAsync(glyph, TestCancellation);
+            var second = await map.RenderCellAsync(glyph, Tests.Cancellation);
             Assert.Same(first, second);
             Assert.True(map.Cache.Hits >= 1);
         }
@@ -222,7 +221,7 @@ public class GlyphMapViewModelTests
             await map.ReloadAsync();
 
             foreach (GlyphEntry glyph in map.Rows.SelectMany(row => row.Cells).Take(1200))
-                await map.RenderCellAsync(glyph, TestCancellation);
+                await map.RenderCellAsync(glyph, Tests.Cancellation);
 
             Assert.True(map.Cache.Count <= FontEngineLimits.GlyphCellCount);
             Assert.True(map.Cache.Bytes <= FontEngineLimits.GlyphCellBytes,
@@ -335,7 +334,6 @@ public class GlyphMapViewModelTests
 /// </summary>
 public class InfoViewModelTests
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task TheInfoPanel_ShowsWhatTheFontSaysAboutItself()

@@ -15,21 +15,9 @@ namespace TypographyFontFileViewer.Tests;
 /// test machine under load is not a user's machine. They are here to catch a change
 /// that makes scanning slow by an order of magnitude, not to measure milliseconds.
 /// </remarks>
-public class ScanPerformanceTests : IDisposable
+public class ScanPerformanceTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(
-        Path.GetTempPath(), $"tffv-perf-{Guid.NewGuid():N}");
-
-    public ScanPerformanceTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true); }
-        catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
+    public ScanPerformanceTests() : base("perf") { }
 
     /// <summary>Makes a folder of small, real font files by copying one many times.</summary>
     private int Seed(int count)
@@ -39,7 +27,7 @@ public class ScanPerformanceTests : IDisposable
 
         byte[] bytes = File.ReadAllBytes(source);
         for (int i = 0; i < count; i++)
-            File.WriteAllBytes(Path.Combine(_folder, $"Font{i:D4}.ttf"), bytes);
+            File.WriteAllBytes(Path.Combine(Root, $"Font{i:D4}.ttf"), bytes);
 
         return count;
     }
@@ -53,10 +41,10 @@ public class ScanPerformanceTests : IDisposable
 
         // Warm the directory metadata so this measures the scan, not the first stat of
         // a folder the file system has never seen.
-        await scanner.ScanAsync(_folder, false, TestCancellation);
+        await scanner.ScanAsync(Root, false, TestCancellation);
 
         var timer = Stopwatch.StartNew();
-        var fonts = await scanner.ScanAsync(_folder, false, TestCancellation);
+        var fonts = await scanner.ScanAsync(Root, false, TestCancellation);
         timer.Stop();
 
         Assert.Equal(count, fonts.Count);
@@ -113,7 +101,7 @@ public class ScanPerformanceTests : IDisposable
 
         for (int i = 0; i < count; i++)
         {
-            var key = FaceKey.For(Path.Combine(_folder, $"Font{i:D4}.ttf"), 0);
+            var key = FaceKey.For(Path.Combine(Root, $"Font{i:D4}.ttf"), 0);
 
             var timer = Stopwatch.StartNew();
             await service.RenderTextAsync(key, "Next font", 36, 96, 800, RenderStyle.Light,
@@ -137,14 +125,14 @@ public class ScanPerformanceTests : IDisposable
 
         // What the scan costs over and above simply listing the directory.
         var enumerate = Stopwatch.StartNew();
-        int listed = Directory.EnumerateFiles(_folder, "*").Count();
+        int listed = Directory.EnumerateFiles(Root, "*").Count();
         enumerate.Stop();
 
         var scanner = new FolderScanner();
-        await scanner.ScanAsync(_folder, false, TestCancellation);
+        await scanner.ScanAsync(Root, false, TestCancellation);
 
         var scan = Stopwatch.StartNew();
-        var fonts = await scanner.ScanAsync(_folder, false, TestCancellation);
+        var fonts = await scanner.ScanAsync(Root, false, TestCancellation);
         scan.Stop();
 
         Assert.Equal(listed, fonts.Count);
