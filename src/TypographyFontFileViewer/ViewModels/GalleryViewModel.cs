@@ -172,12 +172,7 @@ public sealed partial class GalleryViewModel : ObservableObject, IDisposable
             clipWidthPx: Math.Max(200, RowWidthPx));
 
         if (cancellationToken.IsCancellationRequested) return null;
-        if (rendered.Width <= 0 || rendered.Height <= 0) return null;
-
-        var bitmap = BitmapSource.Create(
-            rendered.Width, rendered.Height, dpi, dpi,
-            System.Windows.Media.PixelFormats.Bgra32, null, rendered.Bgra, rendered.Stride);
-        bitmap.Freeze();
+        if (FrozenBitmap.From(rendered, dpi) is not { } bitmap) return null;
 
         Cache.Add(key, bitmap);
         return bitmap;

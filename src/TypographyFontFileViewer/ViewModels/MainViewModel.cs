@@ -117,16 +117,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         FontItemViewModel? wanted = SelectedFont;
 
         VisibleFonts.ReplaceAll(Fonts.Where(Matches));
-
-        OnPropertyChanged(nameof(FolderSummary));
-        OnPropertyChanged(nameof(SelectedPosition));
-        OnPropertyChanged(nameof(StatusText));
+        NotifyListChanged();
 
         // Keep the selection where it still shows; otherwise move to the first match, so
         // a search always leaves something previewed rather than an empty panel.
         SelectedFont = wanted is not null && VisibleFonts.Contains(wanted)
             ? wanted
             : VisibleFonts.Count > 0 ? VisibleFonts[0] : null;
+    }
+
+    /// <summary>
+    /// The three read-only properties that describe the list rather than one font, and
+    /// so have to be re-read together whenever the list or the selection moves.
+    /// </summary>
+    private void NotifyListChanged()
+    {
+        OnPropertyChanged(nameof(FolderSummary));
+        OnPropertyChanged(nameof(SelectedPosition));
+        OnPropertyChanged(nameof(StatusText));
     }
 
     private bool Matches(FontItemViewModel font)
@@ -438,9 +446,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         finally
         {
             IsScanning = false;
-            OnPropertyChanged(nameof(FolderSummary));
-            OnPropertyChanged(nameof(SelectedPosition));
-            OnPropertyChanged(nameof(StatusText));
+            NotifyListChanged();
         }
 
         Debug.WriteLine($"Listed {Fonts.Count} fonts in {timer.ElapsedMilliseconds} ms");
@@ -511,8 +517,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (SortOrder != SortOrder.FileName) ApplySort();
 
                 RefreshFilter();
-                OnPropertyChanged(nameof(FolderSummary));
-                OnPropertyChanged(nameof(StatusText));
             }
         }
     }
@@ -550,8 +554,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         // The new faces have to reach the screen, which means through the filter.
         RefreshFilter();
-        OnPropertyChanged(nameof(SelectedPosition));
-        OnPropertyChanged(nameof(StatusText));
         return summaries.Length - 1;
     }
 
@@ -750,8 +752,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 ? null
                 : VisibleFonts[Math.Min(index, VisibleFonts.Count - 1)];
 
-            OnPropertyChanged(nameof(FolderSummary));
-            OnPropertyChanged(nameof(SelectedPosition));
+            NotifyListChanged();
         }
 
         await RefreshFavoriteFlagsAsync();

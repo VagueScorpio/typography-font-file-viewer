@@ -73,14 +73,22 @@ internal sealed unsafe class FontEngineContext
         FontFormat format = SniffFormat(path, raw);
         return (FormatNormalizer.ToSfnt(raw, format, path), format);
     }
+
     /// <summary>
     /// Opens a face without putting it in the cache. The caller disposes it.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The bytes must already have been through <see cref="FormatNormalizer"/>; a WOFF
+    /// file handed straight to FreeType would either fail or, worse, open with whatever
+    /// partial support the native library happens to have.
+    /// </para>
+    /// <para>
     /// For the background metadata pass, which opens every font in a folder exactly
     /// once. Caching those fills the cache with fonts nobody has asked to look at,
     /// evicting the ones they have, and holds a folder worth of font data live while
     /// the pass runs. One font at a time is all it needs.
+    /// </para>
     /// </remarks>
     public LoadedFace LoadFaceUncached(FaceKey key, byte[] bytes, FontFormat format)
     {
@@ -91,28 +99,9 @@ internal sealed unsafe class FontEngineContext
         return LoadedFace.Load(_library, key, bytes, format, companions);
     }
 
-
-
-    /// <summary>
-    /// Opens a face from SFNT bytes already in hand, adding it to the cache.
-    /// </summary>
-    /// <remarks>
-    /// The bytes must already have been through <see cref="FormatNormalizer"/>; a WOFF
-    /// file handed straight to FreeType would either fail or, worse, open with whatever
-    /// partial support the native library happens to have.
-    /// </remarks>
+    /// <summary>Opens a face from SFNT bytes already in hand, adding it to the cache.</summary>
     public LoadedFace LoadFace(FaceKey key, byte[] bytes, FontFormat format)
-    {
-        LoadedFace? cached = Cache.TryGet(key);
-        if (cached is not null) return cached;
-
-        IReadOnlyList<string> companions = format == FontFormat.Type1
-            ? FindType1Companions(key.Path)
-            : [];
-
-        LoadedFace face = LoadedFace.Load(_library, key, bytes, format, companions);
-        return Cache.Add(face);
-    }
+        => Cache.TryGet(key) ?? Cache.Add(LoadFaceUncached(key, bytes, format));
 
     /// <summary>Identifies a file from its first bytes, falling back to the name.</summary>
     public static FontFormat SniffFormat(string path, byte[] bytes)
