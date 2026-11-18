@@ -109,21 +109,9 @@ public class RenderedBitmapCacheTests
 /// Phase 4 acceptance: a folder of a thousand fonts renders row by row without the
 /// memory or the queue growing without limit.
 /// </summary>
-public class GalleryViewModelTests : IDisposable
+public class GalleryViewModelTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(
-        Path.GetTempPath(), $"tffv-gallery-{Guid.NewGuid():N}");
-
-    public GalleryViewModelTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_folder)) Directory.Delete(_folder, recursive: true); }
-        catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
+    public GalleryViewModelTests() : base("gallery") { }
 
     private List<string> SeedCopies(int count)
     {
@@ -135,7 +123,7 @@ public class GalleryViewModelTests : IDisposable
 
         for (int i = 0; i < count; i++)
         {
-            string path = Path.Combine(_folder, $"Font{i:D4}.ttf");
+            string path = Path.Combine(Root, $"Font{i:D4}.ttf");
             File.WriteAllBytes(path, bytes);
             paths.Add(path);
         }
@@ -187,7 +175,7 @@ public class GalleryViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task ChangingTheTextOrTheSize_AsksEveryRowToRedrawOnce()
+    public void ChangingTheTextOrTheSize_AsksEveryRowToRedrawOnce()
     {
         using var service = new RenderService();
         using var preview = new PreviewViewModel(service);
@@ -203,8 +191,6 @@ public class GalleryViewModelTests : IDisposable
 
         preview.DarkBackground = true;
         Assert.Equal(before + 3, gallery.Epoch);
-
-        await Task.CompletedTask;
     }
 
     [Fact]
@@ -299,7 +285,7 @@ public class GalleryViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task TheGalleryRowHeight_FollowsTheSize()
+    public void TheGalleryRowHeight_FollowsTheSize()
     {
         using var service = new RenderService();
         using var preview = new PreviewViewModel(service);
@@ -312,6 +298,5 @@ public class GalleryViewModelTests : IDisposable
         double large = gallery.RowHeight;
 
         Assert.True(large > small * 3, "row height should scale with the gallery size");
-        await Task.CompletedTask;
     }
 }

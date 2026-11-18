@@ -161,16 +161,10 @@ public sealed class FolderScanner
         string baseName = Path.GetFileNameWithoutExtension(path);
 
         if (!companionsByFolder.TryGetValue(folder, out Dictionary<string, List<string>>? byBaseName))
-        {
-            byBaseName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-            companionsByFolder[folder] = byBaseName;
-        }
+            companionsByFolder[folder] = byBaseName = new(StringComparer.OrdinalIgnoreCase);
 
         if (!byBaseName.TryGetValue(baseName, out List<string>? list))
-        {
-            list = [];
-            byBaseName[baseName] = list;
-        }
+            byBaseName[baseName] = list = [];
 
         list.Add(path);
     }

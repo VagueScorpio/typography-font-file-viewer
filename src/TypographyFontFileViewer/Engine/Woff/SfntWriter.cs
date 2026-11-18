@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using TypographyFontFileViewer.Core;
 
 namespace TypographyFontFileViewer.Engine.Woff;
@@ -143,29 +144,20 @@ internal static class SfntWriter
 
     public static int Align4(int length) => (length + 3) & ~3;
 
+    // SFNT is big-endian throughout, whatever the machine is.
+
     public static void WriteUInt16(byte[] buffer, int offset, ushort value)
-    {
-        buffer[offset] = (byte)(value >> 8);
-        buffer[offset + 1] = (byte)value;
-    }
+        => BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(offset), value);
 
     public static void WriteInt16(byte[] buffer, int offset, short value)
-        => WriteUInt16(buffer, offset, (ushort)value);
+        => BinaryPrimitives.WriteInt16BigEndian(buffer.AsSpan(offset), value);
 
     public static void WriteUInt32(byte[] buffer, int offset, uint value)
-    {
-        buffer[offset] = (byte)(value >> 24);
-        buffer[offset + 1] = (byte)(value >> 16);
-        buffer[offset + 2] = (byte)(value >> 8);
-        buffer[offset + 3] = (byte)value;
-    }
+        => BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(offset), value);
 
     public static uint ReadUInt32(byte[] buffer, int offset)
-        => ((uint)buffer[offset] << 24)
-         | ((uint)buffer[offset + 1] << 16)
-         | ((uint)buffer[offset + 2] << 8)
-         | buffer[offset + 3];
+        => BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset));
 
     public static ushort ReadUInt16(byte[] buffer, int offset)
-        => (ushort)((buffer[offset] << 8) | buffer[offset + 1]);
+        => BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(offset));
 }

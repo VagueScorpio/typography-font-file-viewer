@@ -241,7 +241,6 @@ internal static unsafe class MetadataReader
         return detail with
         {
             AdvanceWidth = (int)(long)metrics.horiAdvance,
-            LeftSideBearing = bearingX,
             MinX = bearingX,
             MaxX = bearingX + width,
             MinY = bearingY - height,
@@ -293,11 +292,7 @@ internal static unsafe class MetadataReader
             best[nameId] = (score, decoded.Trim());
         }
 
-        var result = new Dictionary<int, string>(best.Count);
-        foreach ((int nameId, (int _, string value)) in best)
-            result[nameId] = value;
-
-        return result;
+        return best.ToDictionary(entry => entry.Key, entry => entry.Value.Value);
     }
 
     /// <summary>
@@ -504,10 +499,13 @@ internal static unsafe class MetadataReader
 
     // --- Small helpers ---------------------------------------------------------
 
-    private static string FirstNonEmpty(params string?[] candidates)
+    // ReadOnlySpan rather than an array: these are called about fifteen times per font,
+    // and the background pass reads every font in the folder.
+
+    private static string FirstNonEmpty(params ReadOnlySpan<string?> candidates)
         => FirstNonEmptyOrNull(candidates) ?? string.Empty;
 
-    private static string? FirstNonEmptyOrNull(params string?[] candidates)
+    private static string? FirstNonEmptyOrNull(params ReadOnlySpan<string?> candidates)
     {
         foreach (string? candidate in candidates)
             if (!string.IsNullOrWhiteSpace(candidate)) return candidate.Trim();

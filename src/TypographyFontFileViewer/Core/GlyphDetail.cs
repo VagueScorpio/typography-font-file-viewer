@@ -25,8 +25,7 @@ public sealed record GlyphDetail
 
     public int AdvanceWidth { get; init; }
 
-    public int LeftSideBearing { get; init; }
-
+    /// <summary>The left side bearing is <see cref="MinX"/>; the two are the same number.</summary>
     public int MinX { get; init; }
     public int MinY { get; init; }
     public int MaxX { get; init; }
@@ -47,6 +46,15 @@ public sealed record GlyphDetail
         : null;
 
     public string CodepointLabel => IsMapped
-        ? "U+" + Codepoint.ToString(Codepoint > 0xFFFF ? "X6" : "X4", CultureInfo.InvariantCulture)
+        ? DescribeCodepoint(Codepoint, GlyphIndex)
         : $"glyph #{GlyphIndex}";
+
+    /// <summary>
+    /// How a code point is written wherever the app names one: <c>U+00E9</c>, widened to
+    /// six digits past the basic plane, or <c>#n</c> when no character reaches the glyph.
+    /// </summary>
+    public static string DescribeCodepoint(int codepoint, uint glyphIndex)
+        => codepoint >= 0
+            ? "U+" + codepoint.ToString(codepoint > 0xFFFF ? "X6" : "X4", CultureInfo.InvariantCulture)
+            : $"#{glyphIndex}";
 }

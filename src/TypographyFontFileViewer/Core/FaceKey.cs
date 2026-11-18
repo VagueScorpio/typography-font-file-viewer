@@ -19,23 +19,5 @@ public readonly record struct FaceKey(string Path, int FaceIndex, long Length, D
         return new FaceKey(path, faceIndex, info.Length, info.LastWriteTimeUtc);
     }
 
-    /// <summary>True when the file on disk still matches what this key was built from.</summary>
-    public bool StillMatchesDisk()
-    {
-        try
-        {
-            var info = new FileInfo(Path);
-            return info.Exists && info.Length == Length && info.LastWriteTimeUtc == LastWriteUtc;
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
     public override string ToString() => FaceIndex == 0 ? Path : $"{Path}#{FaceIndex}";
 }

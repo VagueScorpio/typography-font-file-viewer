@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using TypographyFontFileViewer.Core;
 using TypographyFontFileViewer.Services;
 using TypographyFontFileViewer.ViewModels;
@@ -28,207 +27,24 @@ internal sealed class RecordingRecycler : IFileRecycler
     }
 }
 
-public class HashServiceTests : IDisposable
-{
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), $"tffv-hash-{Guid.NewGuid():N}");
-
-    public HashServiceTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private string Write(string name, string contents)
-    {
-        string path = Path.Combine(_folder, name);
-        File.WriteAllText(path, contents);
-        return path;
-    }
-
-    [Fact]
-    public async Task TheSameContentsHashTheSame_WhateverTheNames()
-    {
-        string first = Write("Roboto.ttf", "identical bytes");
-        string second = Write("SomethingElse.ttf", "identical bytes");
-
-        var hashes = new HashService();
-
-        // This is the whole point: identity is the contents, not the name.
-        Assert.Equal(
-            await hashes.ComputeAsync(first, TestCancellation),
-            await hashes.ComputeAsync(second, TestCancellation));
-    }
-
-    [Fact]
-    public async Task DifferentContents_HashDifferently()
-    {
-        string first = Write("A.ttf", "one");
-        string second = Write("B.ttf", "two");
-
-        var hashes = new HashService();
-
-        Assert.NotEqual(
-            await hashes.ComputeAsync(first, TestCancellation),
-            await hashes.ComputeAsync(second, TestCancellation));
-    }
-
-    [Fact]
-    public async Task AFileThatChanges_IsHashedAgain()
-    {
-        string path = Write("Changing.ttf", "before");
-
-        var hashes = new HashService();
-        string? before = await hashes.ComputeAsync(path, TestCancellation);
-
-        // A new length and write time make a new cache key.
-        await Task.Delay(20, TestCancellation);
-        File.WriteAllText(path, "after, and longer");
-
-        Assert.NotEqual(before, await hashes.ComputeAsync(path, TestCancellation));
-    }
-
-    [Fact]
-    public async Task AMissingFile_IsNullRatherThanAnException()
-    {
-        var hashes = new HashService();
-        Assert.Null(await hashes.ComputeAsync(
-            Path.Combine(_folder, "nowhere.ttf"), TestCancellation));
-    }
-
-    [Fact]
-    public async Task HashingDoesNotLockTheFile()
-    {
-        string path = Write("Open.ttf", "contents");
-
-        var hashes = new HashService();
-        Assert.NotNull(await hashes.ComputeAsync(path, TestCancellation));
-
-        File.Delete(path);
-        Assert.False(File.Exists(path));
-    }
-}
-
-public class SettingsServiceTests : IDisposable
-{
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), $"tffv-settings-{Guid.NewGuid():N}");
-
-    public SettingsServiceTests() => Directory.CreateDirectory(_folder);
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private string Path_ => System.IO.Path.Combine(_folder, "TypographyFontFileViewer.json");
-
-    [Fact]
-    public void SettingsSurviveARoundTrip()
-    {
-        var saved = new SettingsService(Path_);
-        saved.Current.Favorites.Add(new FavoriteEntry
-        {
-            FileName = "Inter-Regular.ttf",
-            Sha256 = "abc123",
-            Size = 4096,
-        });
-
-        Assert.True(saved.Save());
-
-        var loaded = new SettingsService(Path_);
-        loaded.Load();
-
-        FavoriteEntry entry = Assert.Single(loaded.Current.Favorites);
-        Assert.Equal("Inter-Regular.ttf", entry.FileName);
-        Assert.Equal("abc123", entry.Sha256);
-        Assert.Equal(4096, entry.Size);
-    }
-
-    [Fact]
-    public void AMissingFile_LoadsDefaults()
-    {
-        var settings = new SettingsService(Path_);
-        settings.Load();
-
-        Assert.Empty(settings.Current.Favorites);
-        Assert.Null(settings.LastProblem);
-    }
-
-    [Fact]
-    public void ACorruptFile_IsRenamedAndDefaultsAreUsed()
-    {
-        File.WriteAllText(Path_, "{ this is not json");
-
-        var settings = new SettingsService(Path_);
-        settings.Load();
-
-        Assert.Empty(settings.Current.Favorites);
-        Assert.False(string.IsNullOrWhiteSpace(settings.LastProblem));
-
-        // Renamed rather than deleted: it is the user's data.
-        Assert.True(File.Exists(Path_ + ".bad"));
-        Assert.False(File.Exists(Path_));
-    }
-
-    [Fact]
-    public void FieldsFromANewerVersion_SurviveARoundTrip()
-    {
-        File.WriteAllText(Path_, """
-            { "Favorites": [], "SomethingFromTheFuture": { "a": 1 } }
-            """);
-
-        var settings = new SettingsService(Path_);
-        settings.Load();
-        Assert.True(settings.Save());
-
-        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(Path_));
-        Assert.True(document.RootElement.TryGetProperty("SomethingFromTheFuture", out _),
-            "an older version should not strip settings it does not understand");
-    }
-
-    [Fact]
-    public void SavingLeavesNoTemporaryFileBehind()
-    {
-        var settings = new SettingsService(Path_);
-        Assert.True(settings.Save());
-
-        Assert.False(File.Exists(Path_ + ".tmp"));
-        Assert.True(File.Exists(Path_));
-    }
-}
-
 /// <summary>
 /// Phase 5 acceptance: favouriting copies the file next to the exe, un-favouriting sends
 /// that copy to the Recycle Bin, and the stars stay right across restarts and renames.
 /// </summary>
-public class FavoritesServiceTests : IDisposable
+public class FavoritesServiceTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-fav-{Guid.NewGuid():N}");
     private readonly string _source;
     private readonly string _favorites;
 
-    public FavoritesServiceTests()
+    public FavoritesServiceTests() : base("fav")
     {
-        _source = Path.Combine(_root, "source");
-        _favorites = Path.Combine(_root, "Favorite Fonts");
-        Directory.CreateDirectory(_source);
-    }
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
+        _source = Folder("source");
+        _favorites = Path.Combine(Root, "Favorite Fonts");
     }
 
     private (FavoritesService Service, RecordingRecycler Recycler, SettingsService Settings) Build()
     {
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         settings.Load();
 
         var recycler = new RecordingRecycler();
@@ -546,10 +362,10 @@ public class FavoritesServiceTests : IDisposable
     public async Task AFolderThatCannotBeCreated_SaysSoPlainly()
     {
         // A folder cannot live inside a file, so this stands in for Program Files.
-        string blocker = Path.Combine(_root, "blocker");
+        string blocker = Path.Combine(Root, "blocker");
         File.WriteAllText(blocker, "not a directory");
 
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         var service = new FavoritesService(
             Path.Combine(blocker, "Favorite Fonts"),
             new HashService(), new RecordingRecycler(), settings);
@@ -559,7 +375,7 @@ public class FavoritesServiceTests : IDisposable
         Assert.False(result.Succeeded);
         Assert.Contains("Favorite Fonts", result.Error!, StringComparison.Ordinal);
         Assert.Contains("Move the app", result.Error!, StringComparison.Ordinal);
-        Assert.False(service.IsWritable);
+        Assert.NotNull(service.EnsureDirectoryWritable());
     }
 
     [Fact]
@@ -601,8 +417,8 @@ public class FavoritesServiceTests : IDisposable
     [Fact]
     public void TheRealRecycler_RemovesAFileFromDisk()
     {
-        string path = Path.Combine(_root, $"tffv-recyclebin-test-{Guid.NewGuid():N}.ttf");
-        Directory.CreateDirectory(_root);
+        string path = Path.Combine(Root, $"tffv-recyclebin-test-{Guid.NewGuid():N}.ttf");
+        Directory.CreateDirectory(Root);
         File.WriteAllText(path, "this goes to the Recycle Bin");
 
         string? error = new RecycleBinFileRecycler().Recycle(path);
@@ -614,49 +430,29 @@ public class FavoritesServiceTests : IDisposable
     [Fact]
     public void TheRealRecycler_IsHappyWithAFileThatHasAlreadyGone()
     {
-        string path = Path.Combine(_root, "never-existed.ttf");
+        string path = Path.Combine(Root, "never-existed.ttf");
         Assert.Null(new RecycleBinFileRecycler().Recycle(path));
     }
 }
 
 /// <summary>Favourites as the user meets them: stars in the list, Ctrl+D, the folder.</summary>
-public class FavoritesInTheAppTests : IDisposable
+public class FavoritesInTheAppTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-favapp-{Guid.NewGuid():N}");
     private readonly string _fonts;
     private readonly string _favorites;
 
-    public FavoritesInTheAppTests()
+    public FavoritesInTheAppTests() : base("favapp")
     {
-        _fonts = Path.Combine(_root, "fonts");
-        _favorites = Path.Combine(_root, "Favorite Fonts");
-        Directory.CreateDirectory(_fonts);
+        _fonts = Folder("fonts");
+        _favorites = Path.Combine(Root, "Favorite Fonts");
     }
 
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private void Seed(params string[] names)
-    {
-        string corpus = TestFonts.RequireCorpus();
-
-        foreach (string name in names)
-        {
-            string source = Path.Combine(corpus, name);
-            if (!File.Exists(source)) Assert.Skip($"{name} is not in the corpus.");
-            File.Copy(source, Path.Combine(_fonts, name), overwrite: true);
-        }
-    }
+    private void Seed(params string[] names) => SeedCorpusFonts(_fonts, names);
 
     private (MainViewModel Model, FavoritesService Favorites, RecordingRecycler Recycler, RenderService Render)
         Build()
     {
-        var settings = new SettingsService(Path.Combine(_root, "settings.json"));
+        var settings = new SettingsService(Path.Combine(Root, "settings.json"));
         settings.Load();
 
         var recycler = new RecordingRecycler();
@@ -756,7 +552,7 @@ public class FavoritesInTheAppTests : IDisposable
             await model.ToggleFavoriteCommand.ExecuteAsync(null);
 
             // The same bytes under a different name, somewhere else entirely.
-            string elsewhere = Path.Combine(_root, "elsewhere");
+            string elsewhere = Path.Combine(Root, "elsewhere");
             Directory.CreateDirectory(elsewhere);
             File.Copy(
                 Path.Combine(_fonts, "Inter-Regular.ttf"),

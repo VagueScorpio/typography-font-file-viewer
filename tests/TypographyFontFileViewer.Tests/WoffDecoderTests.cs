@@ -13,17 +13,9 @@ namespace TypographyFontFileViewer.Tests;
 public class WoffDecoderTests
 {
     /// <summary>The runner's token, so a wedged test can actually be cancelled.</summary>
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
     /// <summary>Text with enough variety to catch a mistake in any single glyph.</summary>
     private const string Specimen = "Hamburgefonstiv AVWA 0123 éñ .,;:!?";
-
-    private static string WriteTempFile(string extension, byte[] contents)
-    {
-        string path = Path.Combine(Path.GetTempPath(), $"tffv-{Guid.NewGuid():N}{extension}");
-        File.WriteAllBytes(path, contents);
-        return path;
-    }
 
     /// <summary>Every SFNT font in the corpus that has both web-font siblings.</summary>
     private static IEnumerable<(string Sfnt, string Woff, string Woff2)> Triples()
@@ -52,9 +44,9 @@ public class WoffDecoderTests
 
         foreach ((string sfnt, string woff, string woff2) in triples)
         {
-            FaceSummary original = (await service.ReadSummariesAsync(sfnt, cancellationToken: TestCancellation))[0];
-            FaceSummary fromWoff = (await service.ReadSummariesAsync(woff, cancellationToken: TestCancellation))[0];
-            FaceSummary fromWoff2 = (await service.ReadSummariesAsync(woff2, cancellationToken: TestCancellation))[0];
+            FaceSummary original = (await service.ReadSummariesAsync(sfnt, cancellationToken: Tests.Cancellation))[0];
+            FaceSummary fromWoff = (await service.ReadSummariesAsync(woff, cancellationToken: Tests.Cancellation))[0];
+            FaceSummary fromWoff2 = (await service.ReadSummariesAsync(woff2, cancellationToken: Tests.Cancellation))[0];
 
             string name = Path.GetFileNameWithoutExtension(sfnt);
 
@@ -116,7 +108,7 @@ public class WoffDecoderTests
     private static Task<RenderedText> Render(RenderService service, string path, double points = 32)
         => service.RenderTextAsync(
             FaceKey.For(path, 0), Specimen, points, 96, 0, RenderStyle.Light,
-            cancellationToken: TestCancellation);
+            cancellationToken: Tests.Cancellation);
 
     private static IEnumerable<string> Compare(string label, RenderedText expected, RenderedText actual)
     {
@@ -185,7 +177,7 @@ public class WoffDecoderTests
         string woff2 = TestFonts.Require("SourceSerif4-Regular.woff2");
 
         using var service = new RenderService();
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(woff2, 0), cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(woff2, 0), cancellationToken: Tests.Cancellation);
 
         // A CFF font has no glyf to transform, so this exercises the plain pass-through
         // of every table through the Brotli stream.
@@ -200,7 +192,7 @@ public class WoffDecoderTests
         string woff2 = TestFonts.Require("Inter[opsz,wght].woff2");
 
         using var service = new RenderService();
-        FontInfo info = await service.ReadInfoAsync(FaceKey.For(woff2, 0), cancellationToken: TestCancellation);
+        FontInfo info = await service.ReadInfoAsync(FaceKey.For(woff2, 0), cancellationToken: Tests.Cancellation);
 
         Assert.True(info.IsVariable);
         Assert.Contains(info.VariationAxes, axis => axis.Tag == "wght");
@@ -216,9 +208,9 @@ public class WoffDecoderTests
         using var service = new RenderService();
 
         IReadOnlyList<GlyphEntry> fromSfnt =
-            await service.ListGlyphsAsync(FaceKey.For(sfnt, 0), cancellationToken: TestCancellation);
+            await service.ListGlyphsAsync(FaceKey.For(sfnt, 0), cancellationToken: Tests.Cancellation);
         IReadOnlyList<GlyphEntry> fromWoff2 =
-            await service.ListGlyphsAsync(FaceKey.For(woff2, 0), cancellationToken: TestCancellation);
+            await service.ListGlyphsAsync(FaceKey.For(woff2, 0), cancellationToken: Tests.Cancellation);
 
         Assert.Equal(fromSfnt.Count, fromWoff2.Count);
         Assert.Equal(
@@ -244,18 +236,11 @@ public class WoffDecoderTests
         // the compressed stream. Each lands in a different part of the decoder.
         foreach (double fraction in new[] { 0.02, 0.1, 0.5, 0.95 })
         {
-            string path = WriteTempFile(extension, whole[..(int)(whole.Length * fraction)]);
-            try
-            {
-                FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
-                Assert.True(summary.IsBroken,
-                    $"A {extension} truncated to {fraction:P0} opened anyway.");
-                Assert.False(string.IsNullOrWhiteSpace(summary.Error));
-            }
-            finally
-            {
-                File.Delete(path);
-            }
+            using TempFile temp = TempFile.With(extension, whole[..(int)(whole.Length * fraction)]);
+            FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
+            Assert.True(summary.IsBroken,
+                $"A {extension} truncated to {fraction:P0} opened anyway.");
+            Assert.False(string.IsNullOrWhiteSpace(summary.Error));
         }
     }
 
@@ -278,26 +263,19 @@ public class WoffDecoderTests
             damaged[at] ^= 0xFF;
         }
 
-        string path = WriteTempFile(extension, damaged);
-        try
+        using TempFile temp = TempFile.With(extension, damaged);
+        // Either it fails cleanly or the damage happened to land somewhere harmless.
+        // What it must never do is crash the engine or hang.
+        FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
+        if (!summary.IsBroken)
         {
-            // Either it fails cleanly or the damage happened to land somewhere harmless.
-            // What it must never do is crash the engine or hang.
-            FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
-            if (!summary.IsBroken)
-            {
-                RenderedText rendered = await Render(service, path);
-                Assert.True(rendered.Width > 0);
-            }
+            RenderedText rendered = await Render(service, temp.Path);
+            Assert.True(rendered.Width > 0);
+        }
 
-            // And the engine is still alive afterwards.
-            FaceSummary good = (await service.ReadSummariesAsync(sources[0], cancellationToken: TestCancellation))[0];
-            Assert.False(good.IsBroken);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        // And the engine is still alive afterwards.
+        FaceSummary good = (await service.ReadSummariesAsync(sources[0], cancellationToken: Tests.Cancellation))[0];
+        Assert.False(good.IsBroken);
     }
 
     [Fact]
@@ -312,19 +290,12 @@ public class WoffDecoderTests
         byte[] lying = (byte[])whole.Clone();
         lying[8] = 0x7F; lying[9] = 0xFF; lying[10] = 0xFF; lying[11] = 0xFF;
 
-        string path = WriteTempFile(".woff2", lying);
-        try
-        {
-            using var service = new RenderService();
-            FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
+        using TempFile temp = TempFile.With(".woff2", lying);
+        using var service = new RenderService();
+        FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
 
-            Assert.True(summary.IsBroken);
-            Assert.Contains("bytes", summary.Error, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        Assert.True(summary.IsBroken);
+        Assert.Contains("bytes", summary.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -340,19 +311,12 @@ public class WoffDecoderTests
         byte[] bomb = (byte[])whole.Clone();
         bomb[16] = 0x40; bomb[17] = 0x00; bomb[18] = 0x00; bomb[19] = 0x00;
 
-        string path = WriteTempFile(".woff2", bomb);
-        try
-        {
-            using var service = new RenderService();
-            FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
+        using TempFile temp = TempFile.With(".woff2", bomb);
+        using var service = new RenderService();
+        FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
 
-            Assert.True(summary.IsBroken);
-            Assert.Contains("MB", summary.Error, StringComparison.Ordinal);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        Assert.True(summary.IsBroken);
+        Assert.Contains("MB", summary.Error, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -368,19 +332,12 @@ public class WoffDecoderTests
         byte[] empty = (byte[])whole.Clone();
         empty[12] = 0; empty[13] = 0;
 
-        string path = WriteTempFile(extension, empty);
-        try
-        {
-            using var service = new RenderService();
-            FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
+        using TempFile temp = TempFile.With(extension, empty);
+        using var service = new RenderService();
+        FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
 
-            Assert.True(summary.IsBroken);
-            Assert.Contains("no tables", summary.Error, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        Assert.True(summary.IsBroken);
+        Assert.Contains("no tables", summary.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -394,16 +351,9 @@ public class WoffDecoderTests
             (".woff2", [(byte)'w', (byte)'O', (byte)'F', (byte)'2']),
         })
         {
-            string path = WriteTempFile(extension, signature);
-            try
-            {
-                FaceSummary summary = (await service.ReadSummariesAsync(path, cancellationToken: TestCancellation))[0];
-                Assert.True(summary.IsBroken);
-            }
-            finally
-            {
-                File.Delete(path);
-            }
+            using TempFile temp = TempFile.With(extension, signature);
+            FaceSummary summary = (await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation))[0];
+            Assert.True(summary.IsBroken);
         }
     }
 
@@ -425,19 +375,12 @@ public class WoffDecoderTests
             random.NextBytes(junk);
             junk[0] = (byte)'w'; junk[1] = (byte)'O'; junk[2] = (byte)'F'; junk[3] = (byte)'2';
 
-            string path = WriteTempFile(".woff2", junk);
-            try
-            {
-                FaceSummary[] summaries = await service.ReadSummariesAsync(path, cancellationToken: TestCancellation);
-                Assert.NotEmpty(summaries);
-            }
-            finally
-            {
-                File.Delete(path);
-            }
+            using TempFile temp = TempFile.With(".woff2", junk);
+            FaceSummary[] summaries = await service.ReadSummariesAsync(temp.Path, cancellationToken: Tests.Cancellation);
+            Assert.NotEmpty(summaries);
         }
 
-        FaceSummary good = (await service.ReadSummariesAsync(sources[0], cancellationToken: TestCancellation))[0];
+        FaceSummary good = (await service.ReadSummariesAsync(sources[0], cancellationToken: Tests.Cancellation))[0];
         Assert.False(good.IsBroken, "the engine stopped working after a run of bad files");
     }
 
@@ -447,20 +390,13 @@ public class WoffDecoderTests
         IReadOnlyList<string> sources = TestFonts.WithExtension(".woff2");
         if (sources.Count == 0) Assert.Skip("No .woff2 font in the corpus.");
 
-        string copy = WriteTempFile(".woff2", File.ReadAllBytes(sources[0]));
-        try
-        {
-            using var service = new RenderService();
-            await Render(service, copy);
+        using TempFile temp = TempFile.With(".woff2", File.ReadAllBytes(sources[0]));
+        using var service = new RenderService();
+        await Render(service, temp.Path);
 
-            // Decoding reads the file into memory and hands FreeType the decoded bytes,
-            // so the original is no more locked than any other font.
-            File.Delete(copy);
-            Assert.False(File.Exists(copy));
-        }
-        finally
-        {
-            if (File.Exists(copy)) File.Delete(copy);
-        }
+        // Decoding reads the file into memory and hands FreeType the decoded bytes,
+        // so the original is no more locked than any other font.
+        File.Delete(temp.Path);
+        Assert.False(File.Exists(temp.Path));
     }
 }

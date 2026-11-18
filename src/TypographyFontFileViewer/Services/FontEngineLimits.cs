@@ -34,7 +34,4 @@ public static class FontEngineLimits
     public const int GlyphCellCount = 2500;
 
     public const long GlyphCellBytes = 24L * 1024 * 1024;
-
-    /// <summary>What the three caches may hold between them.</summary>
-    public const long TotalCacheBytes = FaceCacheBytes + GalleryRowBytes + GlyphCellBytes;
 }

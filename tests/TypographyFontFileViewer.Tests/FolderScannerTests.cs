@@ -9,25 +9,13 @@ namespace TypographyFontFileViewer.Tests;
 /// The scanner turns "the user opened one font" into "here is the whole folder", so what
 /// it includes, what it hides and what order it returns things in is all visible.
 /// </summary>
-public class FolderScannerTests : IDisposable
+public class FolderScannerTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(
-        Path.GetTempPath(), $"tffv-scan-{Guid.NewGuid():N}");
-
-    public FolderScannerTests() => Directory.CreateDirectory(_root);
-
-    public void Dispose()
-    {
-        try { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
-        catch (IOException) { /* a test left a handle open; the temp folder can wait */ }
-        GC.SuppressFinalize(this);
-    }
+    public FolderScannerTests() : base("scan") { }
 
     private string Touch(string relativePath, byte[]? contents = null)
     {
-        string path = Path.Combine(_root, relativePath);
+        string path = Path.Combine(Root, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, contents ?? [0x00, 0x01, 0x00, 0x00]);
         return path;
@@ -44,7 +32,7 @@ public class FolderScannerTests : IDisposable
         Touch("legacy.eot");           // out of scope for v1.0, skipped quietly
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         Assert.Equal(
             ["Alpha.ttf", "Beta.otf", "Gamma.woff2"],
@@ -60,7 +48,7 @@ public class FolderScannerTests : IDisposable
         Touch("Nimbus.inf");
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         FontFile font = Assert.Single(fonts);
         Assert.Equal("Nimbus.pfb", font.FileName);
@@ -78,7 +66,7 @@ public class FolderScannerTests : IDisposable
         Touch("Alpha.afm");
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         FontFile font = Assert.Single(fonts);
         Assert.Empty(font.Companions);
@@ -91,7 +79,7 @@ public class FolderScannerTests : IDisposable
             Touch(name);
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         Assert.Equal(
             ["Font1.ttf", "Font2.ttf", "Font10.ttf", "Font20.ttf"],
@@ -106,10 +94,10 @@ public class FolderScannerTests : IDisposable
 
         var scanner = new FolderScanner();
 
-        IReadOnlyList<FontFile> shallow = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> shallow = await scanner.ScanAsync(Root, false, TestCancellation);
         Assert.Equal(["Top.ttf"], shallow.Select(font => font.FileName));
 
-        IReadOnlyList<FontFile> deep = await scanner.ScanAsync(_root, true, TestCancellation);
+        IReadOnlyList<FontFile> deep = await scanner.ScanAsync(Root, true, TestCancellation);
         Assert.Equal(["Deep.ttf", "Top.ttf"], deep.Select(font => font.FileName).Order());
     }
 
@@ -120,7 +108,7 @@ public class FolderScannerTests : IDisposable
         Touch("Collection.ttf", [0x74, 0x74, 0x63, 0x66]);      // ttcf inside a .ttf
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         Assert.Equal(
             FontFormat.Collection,
@@ -136,7 +124,7 @@ public class FolderScannerTests : IDisposable
         Touch("Empty.ttf", []);
 
         var scanner = new FolderScanner();
-        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(_root, false, TestCancellation);
+        IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(Root, false, TestCancellation);
 
         // The row has to exist so the user can see the file is there and broken.
         FontFile font = Assert.Single(fonts);
@@ -148,7 +136,7 @@ public class FolderScannerTests : IDisposable
     {
         var scanner = new FolderScanner();
         IReadOnlyList<FontFile> fonts = await scanner.ScanAsync(
-            Path.Combine(_root, "not-here"), false, TestCancellation);
+            Path.Combine(Root, "not-here"), false, TestCancellation);
 
         Assert.Empty(fonts);
     }

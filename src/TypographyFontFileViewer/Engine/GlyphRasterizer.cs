@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using FreeTypeSharp;
 using TypographyFontFileViewer.Core;
 using static FreeTypeSharp.FT;
@@ -325,21 +326,18 @@ internal static unsafe class GlyphRasterizer
         }
     }
 
+    /// <summary>
+    /// A canvas filled with the background colour.
+    /// </summary>
+    /// <remarks>
+    /// Filled a word at a time rather than a byte at a time. On a little-endian machine
+    /// the bytes of 0xAARRGGBB land in memory as B, G, R, A — which is exactly the BGRA
+    /// order wanted — so the colour can go straight in as one 32-bit value.
+    /// </remarks>
     private static byte[] FillBackground(int width, int height, uint argb)
     {
         byte[] pixels = new byte[width * height * 4];
-        byte b = (byte)(argb & 0xFF);
-        byte g = (byte)((argb >> 8) & 0xFF);
-        byte r = (byte)((argb >> 16) & 0xFF);
-        byte a = (byte)((argb >> 24) & 0xFF);
-
-        for (int i = 0; i < pixels.Length; i += 4)
-        {
-            pixels[i + 0] = b;
-            pixels[i + 1] = g;
-            pixels[i + 2] = r;
-            pixels[i + 3] = a;
-        }
+        MemoryMarshal.Cast<byte, uint>(pixels.AsSpan()).Fill(argb);
         return pixels;
     }
 

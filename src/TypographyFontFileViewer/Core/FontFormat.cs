@@ -57,23 +57,4 @@ public static class FontFormats
         _ => "?",
     };
 
-    /// <summary>
-    /// True when the format is, or unwraps to, an SFNT file — the ones HarfBuzz can
-    /// shape. Everything else goes through the FreeType fallback path in TextLayout.
-    /// </summary>
-    public static bool IsSfnt(this FontFormat format) => format
-        is FontFormat.TrueType or FontFormat.OpenTypeCff or FontFormat.Collection
-        or FontFormat.Woff or FontFormat.Woff2 or FontFormat.DataFork;
-
-    /// <summary>True for formats that only exist at fixed pixel sizes.</summary>
-    public static bool IsBitmapOnly(this FontFormat format) => format
-        is FontFormat.WindowsBitmap or FontFormat.Bdf or FontFormat.Pcf;
-
-    /// <summary>True for the compressed web wrappers, which must be decoded to SFNT first.</summary>
-    public static bool NeedsDecoding(this FontFormat format) => format
-        is FontFormat.Woff or FontFormat.Woff2;
-
-    /// <summary>True when one file can hold several faces.</summary>
-    public static bool CanHoldManyFaces(this FontFormat format) => format
-        is FontFormat.Collection or FontFormat.DataFork or FontFormat.WindowsBitmap;
 }

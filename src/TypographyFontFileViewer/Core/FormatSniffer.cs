@@ -82,11 +82,11 @@ public static class FormatSniffer
     {
         if (header.Length >= 4)
         {
-            if (Matches(header, "OTTO")) return FontFormat.OpenTypeCff;
-            if (Matches(header, "ttcf")) return FontFormat.Collection;
-            if (Matches(header, "wOFF")) return FontFormat.Woff;
-            if (Matches(header, "wOF2")) return FontFormat.Woff2;
-            if (Matches(header, "true") || Matches(header, "typ1")) return FontFormat.TrueType;
+            if (header.StartsWith("OTTO"u8)) return FontFormat.OpenTypeCff;
+            if (header.StartsWith("ttcf"u8)) return FontFormat.Collection;
+            if (header.StartsWith("wOFF"u8)) return FontFormat.Woff;
+            if (header.StartsWith("wOF2"u8)) return FontFormat.Woff2;
+            if (header.StartsWith("true"u8) || header.StartsWith("typ1"u8)) return FontFormat.TrueType;
 
             // 00 01 00 00 is the TrueType version tag. The outlines inside may still be
             // CFF, but FreeType reports the real format once the face is open.
@@ -115,12 +115,12 @@ public static class FormatSniffer
                 return extension is ".fon" or ".fnt" ? FontFormat.WindowsBitmap : FontFormat.Unknown;
         }
 
-        if (StartsWithText(header, "STARTFONT")) return FontFormat.Bdf;
+        if (header.StartsWith("STARTFONT"u8)) return FontFormat.Bdf;
 
         // PFA is an ASCII PostScript program; the first line names the font type.
-        if (StartsWithText(header, "%!PS-AdobeFont")
-            || StartsWithText(header, "%!FontType1")
-            || StartsWithText(header, "%!PS-Adobe-3.0 Resource-Font"))
+        if (header.StartsWith("%!PS-AdobeFont"u8)
+            || header.StartsWith("%!FontType1"u8)
+            || header.StartsWith("%!PS-Adobe-3.0 Resource-Font"u8))
             return FontFormat.Type1;
 
         return FontFormat.Unknown;
@@ -140,15 +140,4 @@ public static class FormatSniffer
         ".dfont" => FontFormat.DataFork,
         _ => FontFormat.Unknown,
     };
-
-    private static bool Matches(ReadOnlySpan<byte> header, string tag)
-    {
-        if (header.Length < tag.Length) return false;
-        for (int i = 0; i < tag.Length; i++)
-            if (header[i] != (byte)tag[i]) return false;
-        return true;
-    }
-
-    private static bool StartsWithText(ReadOnlySpan<byte> header, string text)
-        => Matches(header, text);
 }

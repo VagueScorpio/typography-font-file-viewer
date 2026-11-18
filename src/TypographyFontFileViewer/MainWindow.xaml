@@ -188,7 +188,7 @@
                 <TextBlock Text="{Binding StatusText}"
                            Foreground="{StaticResource MutedText}"
                            TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="v1.0"
+                <TextBlock x:Name="VersionLabel"
                            HorizontalAlignment="Right"
                            Foreground="{StaticResource MutedText}" />
             </Grid>

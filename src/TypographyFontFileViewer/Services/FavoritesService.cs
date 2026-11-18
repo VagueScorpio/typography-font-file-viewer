@@ -56,7 +56,7 @@ public sealed class FavoritesService
     {
         ArgumentException.ThrowIfNullOrEmpty(favoritesDirectory);
 
-        Directory = System.IO.Path.GetFullPath(favoritesDirectory);
+        Directory = Path.GetFullPath(favoritesDirectory);
         _hashes = hashes;
         _recycler = recycler;
         _settings = settings;
@@ -75,7 +75,7 @@ public sealed class FavoritesService
 
     /// <summary>The folder a given executable keeps its favourites in.</summary>
     public static string DefaultDirectoryFor(string executableDirectory)
-        => System.IO.Path.Combine(executableDirectory, "Favorite Fonts");
+        => Path.Combine(executableDirectory, "Favorite Fonts");
 
     // --- Startup ---------------------------------------------------------------
 
@@ -104,7 +104,7 @@ public sealed class FavoritesService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    string fileName = System.IO.Path.GetFileName(path);
+                    string fileName = Path.GetFileName(path);
                     var info = new FileInfo(path);
 
                     // Trust the remembered hash only while the size still agrees.
@@ -171,8 +171,8 @@ public sealed class FavoritesService
     public bool IsFavoritesFolder(string? folder)
         => !string.IsNullOrEmpty(folder)
         && string.Equals(
-            System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(folder)),
-            System.IO.Path.TrimEndingDirectorySeparator(Directory),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)),
+            Path.TrimEndingDirectorySeparator(Directory),
             StringComparison.OrdinalIgnoreCase);
 
     // --- Adding ----------------------------------------------------------------
@@ -206,14 +206,14 @@ public sealed class FavoritesService
             if (problem is not null) return FavoriteResult.Failed(problem);
 
             string targetName = ChooseTargetName(file.FileName, hash);
-            string targetPath = System.IO.Path.Combine(Directory, targetName);
+            string targetPath = Path.Combine(Directory, targetName);
 
             string? copyError = CopyIntoPlace(file.Path, targetPath);
             if (copyError is not null) return FavoriteResult.Failed(copyError);
 
-            var companions = new List<string>();
-            if (file.Format == FontFormat.Type1)
-                companions = CopyCompanions(file, targetName);
+            List<string> companions = file.Format == FontFormat.Type1
+                ? CopyCompanions(file, targetName)
+                : [];
 
             var entry = new FavoriteEntry
             {
@@ -256,7 +256,7 @@ public sealed class FavoritesService
     {
         string? hash = await _hashes.ComputeAsync(path, cancellationToken);
         if (hash is null)
-            return FavoriteResult.Failed($"{System.IO.Path.GetFileName(path)} could not be read.");
+            return FavoriteResult.Failed($"{Path.GetFileName(path)} could not be read.");
 
         FavoriteEntry? entry;
         lock (_byHash)
@@ -272,7 +272,7 @@ public sealed class FavoritesService
 
             foreach (string name in doomed)
             {
-                string target = System.IO.Path.Combine(Directory, name);
+                string target = Path.Combine(Directory, name);
 
                 // The invariant that makes this safe to call.
                 if (!IsInsideFavorites(target))
@@ -293,7 +293,7 @@ public sealed class FavoritesService
             }
 
             PersistIndex();
-            return FavoriteResult.Ok(System.IO.Path.Combine(Directory, entry.FileName));
+            return FavoriteResult.Ok(Path.Combine(Directory, entry.FileName));
         }
         finally
         {
@@ -334,7 +334,7 @@ public sealed class FavoritesService
             System.IO.Directory.CreateDirectory(Directory);
 
             // Creating the folder can succeed where writing into it does not, so prove it.
-            string probe = System.IO.Path.Combine(Directory, $".write-test-{Guid.NewGuid():N}");
+            string probe = Path.Combine(Directory, $".write-test-{Guid.NewGuid():N}");
             File.WriteAllBytes(probe, []);
             File.Delete(probe);
 
@@ -346,8 +346,6 @@ public sealed class FavoritesService
                  + $"Move the app to a folder you can write to. ({exception.Message})";
         }
     }
-
-    public bool IsWritable => EnsureDirectoryWritable() is null;
 
     // --- Internals -------------------------------------------------------------
 
@@ -362,9 +360,9 @@ public sealed class FavoritesService
     /// </remarks>
     internal bool IsInsideFavorites(string path)
     {
-        string full = System.IO.Path.GetFullPath(path);
-        string root = System.IO.Path.TrimEndingDirectorySeparator(Directory)
-                    + System.IO.Path.DirectorySeparatorChar;
+        string full = Path.GetFullPath(path);
+        string root = Path.TrimEndingDirectorySeparator(Directory)
+                    + Path.DirectorySeparatorChar;
 
         return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
     }
@@ -374,13 +372,13 @@ public sealed class FavoritesService
     /// </summary>
     private string ChooseTargetName(string preferred, string hash)
     {
-        string baseName = System.IO.Path.GetFileNameWithoutExtension(preferred);
-        string extension = System.IO.Path.GetExtension(preferred);
+        string baseName = Path.GetFileNameWithoutExtension(preferred);
+        string extension = Path.GetExtension(preferred);
 
         string candidate = preferred;
         int suffix = 2;
 
-        while (File.Exists(System.IO.Path.Combine(Directory, candidate)))
+        while (File.Exists(Path.Combine(Directory, candidate)))
         {
             // A file of the same name that is the same font would already have matched
             // on its hash, so anything still here is a different font wanting the name.
@@ -411,7 +409,7 @@ public sealed class FavoritesService
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
 
-            return $"Could not copy {System.IO.Path.GetFileName(source)}: {exception.Message}";
+            return $"Could not copy {Path.GetFileName(source)}: {exception.Message}";
         }
     }
 
@@ -419,12 +417,12 @@ public sealed class FavoritesService
     private List<string> CopyCompanions(FontFile file, string targetName)
     {
         var copied = new List<string>();
-        string targetBase = System.IO.Path.GetFileNameWithoutExtension(targetName);
+        string targetBase = Path.GetFileNameWithoutExtension(targetName);
 
         foreach (string companion in file.Companions)
         {
-            string name = targetBase + System.IO.Path.GetExtension(companion);
-            string target = System.IO.Path.Combine(Directory, name);
+            string name = targetBase + Path.GetExtension(companion);
+            string target = Path.Combine(Directory, name);
 
             if (CopyIntoPlace(companion, target) is null) copied.Add(name);
         }
@@ -434,13 +432,13 @@ public sealed class FavoritesService
 
     private static IReadOnlyList<string> FindCompanionsIn(string folder, string fontFileName)
     {
-        string baseName = System.IO.Path.GetFileNameWithoutExtension(fontFileName);
+        string baseName = Path.GetFileNameWithoutExtension(fontFileName);
         var found = new List<string>();
 
         foreach (string extension in new[] { ".afm", ".pfm", ".inf" })
         {
             string candidate = baseName + extension;
-            if (File.Exists(System.IO.Path.Combine(folder, candidate))) found.Add(candidate);
+            if (File.Exists(Path.Combine(folder, candidate))) found.Add(candidate);
         }
 
         return found;
@@ -464,7 +462,7 @@ public sealed class FavoritesService
         }
 
         foreach (string path in entries)
-            if (FormatSniffer.IsSupportedFileName(System.IO.Path.GetFileName(path)))
+            if (FormatSniffer.IsSupportedFileName(Path.GetFileName(path)))
                 yield return path;
     }
 

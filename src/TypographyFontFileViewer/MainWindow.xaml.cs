@@ -21,7 +21,9 @@ public partial class MainWindow : Window
 
         // The XAML carries a title so the designer has something to show; the real one
         // comes from the assembly version, so a version bump touches only the csproj.
+        // The status bar's corner is filled from the same place for the same reason.
         Title = AppInfo.NameAndVersion;
+        VersionLabel.Text = $"v{AppInfo.Version}";
 
         // Everything the app keeps lives beside the exe. Environment.ProcessPath is the
         // one that works in a single-file build; Assembly.Location is empty there.

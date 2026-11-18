@@ -11,36 +11,13 @@ namespace TypographyFontFileViewer.Tests;
 /// Phase 7 acceptance: every setting survives a restart, and search on a thousand fonts
 /// is instant.
 /// </summary>
-public class SearchAndSortTests : IDisposable
+public class SearchAndSortTests : TempFolderTest
 {
-    private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
-
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"tffv-search-{Guid.NewGuid():N}");
     private readonly string _fonts;
 
-    public SearchAndSortTests()
-    {
-        _fonts = Path.Combine(_root, "fonts");
-        Directory.CreateDirectory(_fonts);
-    }
+    public SearchAndSortTests() : base("search") => _fonts = Folder("fonts");
 
-    public void Dispose()
-    {
-        try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
-        GC.SuppressFinalize(this);
-    }
-
-    private void Seed(params string[] names)
-    {
-        string corpus = TestFonts.RequireCorpus();
-
-        foreach (string name in names)
-        {
-            string source = Path.Combine(corpus, name);
-            if (!File.Exists(source)) Assert.Skip($"{name} is not in the corpus.");
-            File.Copy(source, Path.Combine(_fonts, name), overwrite: true);
-        }
-    }
+    private void Seed(params string[] names) => SeedCorpusFonts(_fonts, names);
 
     private static (MainViewModel Model, RenderService Render) Build()
     {
@@ -387,7 +364,7 @@ public class SearchAndSortTests : IDisposable
     {
         Seed("Inter-Regular.ttf");
 
-        string second = Path.Combine(_root, "second");
+        string second = Path.Combine(Root, "second");
         Directory.CreateDirectory(second);
         File.Copy(
             Path.Combine(TestFonts.RequireCorpus(), "NotoSans-Regular.ttf"),
@@ -422,13 +399,13 @@ public class SearchAndSortTests : IDisposable
         {
             for (int i = 0; i < 15; i++)
             {
-                string folder = Path.Combine(_root, $"folder{i}");
+                string folder = Path.Combine(Root, $"folder{i}");
                 Directory.CreateDirectory(folder);
                 await model.OpenPathAsync(folder, TestCancellation);
             }
 
             Assert.Equal(AppSettings.MaximumRecentFolders, model.RecentFolders.Count);
-            Assert.Equal(Path.Combine(_root, "folder14"), model.RecentFolders[0]);
+            Assert.Equal(Path.Combine(Root, "folder14"), model.RecentFolders[0]);
         }
     }
 
@@ -439,7 +416,7 @@ public class SearchAndSortTests : IDisposable
     {
         Seed("Inter-Regular.ttf", "NotoSans-Regular.ttf");
 
-        string settingsPath = Path.Combine(_root, "settings.json");
+        string settingsPath = Path.Combine(Root, "settings.json");
 
         // First run: change things, then write them out.
         var first = new SettingsService(settingsPath);
@@ -496,8 +473,8 @@ public class SearchAndSortTests : IDisposable
     [Fact]
     public void TheSettingsFileIsReadable()
     {
-        string path = Path.Combine(_root, "settings.json");
-        Directory.CreateDirectory(_root);
+        string path = Path.Combine(Root, "settings.json");
+        Directory.CreateDirectory(Root);
 
         var settings = new SettingsService(path);
         settings.Current.SortOrder = SortOrder.FamilyName;
@@ -515,7 +492,7 @@ public class SearchAndSortTests : IDisposable
     [Fact]
     public async Task ReopeningAFolderThatHasGone_StartsEmptyRatherThanComplaining()
     {
-        string missing = Path.Combine(_root, "unplugged");
+        string missing = Path.Combine(Root, "unplugged");
 
         (MainViewModel model, RenderService render) = Build();
 
@@ -533,8 +510,8 @@ public class SearchAndSortTests : IDisposable
     [Fact]
     public void ASettingsFileFromTheFuture_DoesNotLoseItsUnknownFields()
     {
-        string path = Path.Combine(_root, "settings.json");
-        Directory.CreateDirectory(_root);
+        string path = Path.Combine(Root, "settings.json");
+        Directory.CreateDirectory(Root);
 
         File.WriteAllText(path, """
             {

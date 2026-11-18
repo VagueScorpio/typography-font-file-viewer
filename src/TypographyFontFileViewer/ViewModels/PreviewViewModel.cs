@@ -118,10 +118,23 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial int AvailableWidthPx { get; set; } = 600;
 
-    /// <summary>The background the preview panel itself should paint.</summary>
-    public Brush PreviewBackground => DarkBackground
-        ? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14))
-        : Brushes.White;
+    /// <summary>
+    /// The background the preview panel itself should paint.
+    /// </summary>
+    /// <remarks>
+    /// Frozen and shared. Bindings read this on every layout pass, and a fresh brush each
+    /// time would be an allocation per read for a colour that never changes.
+    /// </remarks>
+    public Brush PreviewBackground => DarkBackground ? DarkPanel : Brushes.White;
+
+    private static readonly SolidColorBrush DarkPanel = Frozen(Color.FromRgb(0x14, 0x14, 0x14));
+
+    private static SolidColorBrush Frozen(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
 
     private RenderStyle Style => DarkBackground ? RenderStyle.Dark : RenderStyle.Light;
 
@@ -157,15 +170,7 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
 
-        var request = new CancellationTokenSource();
-        CancellationTokenSource? previous = Interlocked.Exchange(ref _pending, request);
-        // Cancelled but not disposed: another thread may still be holding this token
-        // source, and disposing one out from under an in-flight request is how a
-        // superseded render turns into an ObjectDisposedException. It has nothing
-        // unmanaged to release, so letting the collector have it is enough.
-        previous?.Cancel();
-
-        _ = RenderAsync(request.Token);
+        _ = RenderAsync(CancellationHandoff.Replace(ref _pending).Token);
     }
 
     private async Task RenderAsync(CancellationToken cancellationToken)
@@ -195,7 +200,7 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
 
             if (cancellationToken.IsCancellationRequested) return;
 
-            MainImage = ToBitmap(main, dpi);
+            MainImage = FrozenBitmap.From(main, dpi);
             ErrorMessage = null;
 
             // The waterfall is background work: the big preview must never wait for it.
@@ -211,45 +216,24 @@ public sealed partial class PreviewViewModel : ObservableObject, IDisposable
                     clipWidthPx: width);
 
                 if (cancellationToken.IsCancellationRequested) return;
-                row.Image = ToBitmap(line, dpi);
+                row.Image = FrozenBitmap.From(line, dpi);
             }
         }
         catch (OperationCanceledException)
         {
             // Superseded by a newer request, which now owns the UI.
         }
-        catch (FontLoadException exception)
-        {
-            MainImage = null;
-            foreach (WaterfallRow row in Waterfall) row.Image = null;
-            ErrorMessage = exception.Message;
-        }
         catch (Exception exception)
         {
             MainImage = null;
             foreach (WaterfallRow row in Waterfall) row.Image = null;
-            ErrorMessage = $"{exception.GetType().Name}: {exception.Message}";
+
+            // A font that will not open explains itself; anything else is a bug, and
+            // saying which kind it was is worth more than a tidy sentence.
+            ErrorMessage = exception is FontLoadException
+                ? exception.Message
+                : $"{exception.GetType().Name}: {exception.Message}";
         }
-    }
-
-    /// <summary>
-    /// Wraps the engine's bytes in a frozen bitmap.
-    /// </summary>
-    /// <remarks>
-    /// Freezing is what makes the result safe to hand to WPF from anywhere, and lets the
-    /// renderer skip its own locking. The DPI is baked in so the image occupies the
-    /// right number of device-independent units without any scaling.
-    /// </remarks>
-    private static BitmapSource? ToBitmap(RenderedText rendered, double dpi)
-    {
-        if (rendered.Width <= 0 || rendered.Height <= 0) return null;
-
-        var bitmap = BitmapSource.Create(
-            rendered.Width, rendered.Height, dpi, dpi,
-            PixelFormats.Bgra32, null, rendered.Bgra, rendered.Stride);
-
-        bitmap.Freeze();
-        return bitmap;
     }
 
     public void Dispose()

@@ -104,7 +104,9 @@ public partial class App : Application
             var entry = new StringBuilder();
             entry.AppendLine(new string('-', 72));
             entry.AppendLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  ({origin})");
-            entry.AppendLine($"Version 1.0, {Environment.OSVersion}, .NET {Environment.Version}");
+            entry.AppendLine(
+                $"Version {Core.AppInfo.Version}, {Environment.OSVersion}, "
+                + $".NET {Environment.Version}");
             entry.AppendLine();
             entry.AppendLine(exception.ToString());
             entry.AppendLine();

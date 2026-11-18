@@ -143,15 +143,7 @@ public sealed partial class GlyphMapViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
 
-        CancellationTokenSource request = new();
-        CancellationTokenSource? previous = Interlocked.Exchange(ref _loading, request);
-        // Cancelled but not disposed: another thread may still be holding this token
-        // source, and disposing one out from under an in-flight request is how a
-        // superseded render turns into an ObjectDisposedException. It has nothing
-        // unmanaged to release, so letting the collector have it is enough.
-        previous?.Cancel();
-
-        CancellationToken cancellationToken = request.Token;
+        CancellationToken cancellationToken = CancellationHandoff.Replace(ref _loading).Token;
 
         if (Face is not { } face)
         {
@@ -240,13 +232,7 @@ public sealed partial class GlyphMapViewModel : ObservableObject, IDisposable
 
         if (cancellationToken.IsCancellationRequested || cells.Length == 0) return null;
 
-        GlyphCellBitmap cell = cells[0];
-        if (cell.Width <= 0 || cell.Height <= 0) return null;
-
-        var bitmap = BitmapSource.Create(
-            cell.Width, cell.Height, Dpi, Dpi,
-            System.Windows.Media.PixelFormats.Bgra32, null, cell.Bgra, cell.Stride);
-        bitmap.Freeze();
+        if (FrozenBitmap.From(cells[0], Dpi) is not { } bitmap) return null;
 
         Cache.Add(key, bitmap);
         return bitmap;
@@ -263,7 +249,7 @@ public sealed partial class GlyphMapViewModel : ObservableObject, IDisposable
         try
         {
             System.Windows.Clipboard.SetText(char.ConvertFromUtf32(glyph.Codepoint));
-            Status = $"Copied {TextLayoutLabel(glyph)}";
+            Status = $"Copied {GlyphDetail.DescribeCodepoint(glyph.Codepoint, glyph.GlyphIndex)}";
         }
         catch (Exception exception) when (
             exception is System.Runtime.InteropServices.COMException or ArgumentOutOfRangeException)
@@ -271,12 +257,6 @@ public sealed partial class GlyphMapViewModel : ObservableObject, IDisposable
             Status = "That character could not be copied.";
         }
     }
-
-    private static string TextLayoutLabel(GlyphEntry glyph)
-        => glyph.IsMapped
-            ? "U+" + glyph.Codepoint.ToString(
-                  glyph.Codepoint > 0xFFFF ? "X6" : "X4", CultureInfo.InvariantCulture)
-            : $"#{glyph.GlyphIndex}";
 
     /// <summary>Opens the detail overlay for one glyph.</summary>
     [RelayCommand]
@@ -292,18 +272,7 @@ public sealed partial class GlyphMapViewModel : ObservableObject, IDisposable
             GlyphCellBitmap[] cells = await _renderService.RenderGlyphCellsAsync(
                 face, [glyph], large, Style, JobPriority.High);
 
-            if (cells.Length > 0 && cells[0].Width > 0)
-            {
-                var bitmap = BitmapSource.Create(
-                    cells[0].Width, cells[0].Height, Dpi, Dpi,
-                    System.Windows.Media.PixelFormats.Bgra32, null, cells[0].Bgra, cells[0].Stride);
-                bitmap.Freeze();
-                DetailImage = bitmap;
-            }
-            else
-            {
-                DetailImage = null;
-            }
+            DetailImage = cells.Length > 0 ? FrozenBitmap.From(cells[0], Dpi) : null;
         }
         catch (Exception exception) when (exception is FontLoadException or OperationCanceledException)
         {

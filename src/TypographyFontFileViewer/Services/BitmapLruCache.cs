@@ -52,20 +52,15 @@ public class BitmapLruCache<TKey> where TKey : notnull
         get { lock (_gate) return _bytes; }
     }
 
+    /// <summary>How many lookups were served without rendering again.</summary>
     public int Hits { get; private set; }
-
-    public int Misses { get; private set; }
 
     /// <summary>Returns a cached bitmap, moving it to the front of the queue.</summary>
     public BitmapSource? TryGet(TKey key)
     {
         lock (_gate)
         {
-            if (!_byKey.TryGetValue(key, out var node))
-            {
-                Misses++;
-                return null;
-            }
+            if (!_byKey.TryGetValue(key, out var node)) return null;
 
             _order.Remove(node);
             _order.AddFirst(node);
@@ -103,8 +98,8 @@ public class BitmapLruCache<TKey> where TKey : notnull
 
             while ((_byKey.Count > _maximumEntries || _bytes > _maximumBytes) && _order.Count > 1)
             {
-                var oldest = _order.Last;
-                if (oldest is null) break;
+                // The loop condition guarantees a last node.
+                LinkedListNode<(TKey Key, BitmapSource Bitmap, long Bytes)> oldest = _order.Last!;
 
                 _order.RemoveLast();
                 _byKey.Remove(oldest.Value.Key);

@@ -1,7 +1,5 @@
-using System.Globalization;
 using FreeTypeSharp;
 using HarfBuzzSharp;
-using TypographyFontFileViewer.Core;
 using static FreeTypeSharp.FT;
 using HbBuffer = HarfBuzzSharp.Buffer;
 
@@ -132,19 +130,6 @@ internal static unsafe class TextLayout
             AdvanceWidth = Round26(widestLine26),
             HasMissingGlyphs = anyMissing,
         };
-    }
-
-    /// <summary>Measures a single line without placing it, for the gallery and waterfall.</summary>
-    public static int MeasureWidth(LoadedFace face, string text)
-    {
-        ArgumentNullException.ThrowIfNull(face);
-        if (string.IsNullOrEmpty(text)) return 0;
-
-        int total26 = 0;
-        foreach (ShapedGlyph glyph in Shape(face, text))
-            total26 += glyph.XAdvance26;
-
-        return Round26(total26);
     }
 
     // --- Shaping ---------------------------------------------------------------
@@ -350,8 +335,4 @@ internal static unsafe class TextLayout
 
     /// <summary>26.6 fixed point to whole pixels, rounded rather than truncated.</summary>
     internal static int Round26(int value) => (value + 32) >> 6;
-
-    /// <summary>Formats a code point the way the glyph map labels it.</summary>
-    internal static string FormatCodepoint(int codepoint)
-        => "U+" + codepoint.ToString(codepoint > 0xFFFF ? "X6" : "X4", CultureInfo.InvariantCulture);
 }

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -117,16 +116,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         FontItemViewModel? wanted = SelectedFont;
 
         VisibleFonts.ReplaceAll(Fonts.Where(Matches));
-
-        OnPropertyChanged(nameof(FolderSummary));
-        OnPropertyChanged(nameof(SelectedPosition));
-        OnPropertyChanged(nameof(StatusText));
+        NotifyListChanged();
 
         // Keep the selection where it still shows; otherwise move to the first match, so
         // a search always leaves something previewed rather than an empty panel.
         SelectedFont = wanted is not null && VisibleFonts.Contains(wanted)
             ? wanted
             : VisibleFonts.Count > 0 ? VisibleFonts[0] : null;
+    }
+
+    /// <summary>
+    /// The three read-only properties that describe the list rather than one font, and
+    /// so have to be re-read together whenever the list or the selection moves.
+    /// </summary>
+    private void NotifyListChanged()
+    {
+        OnPropertyChanged(nameof(FolderSummary));
+        OnPropertyChanged(nameof(SelectedPosition));
+        OnPropertyChanged(nameof(StatusText));
     }
 
     private bool Matches(FontItemViewModel font)
@@ -212,9 +219,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial SingleFontPanel CurrentPanel { get; set; } = SingleFontPanel.Preview;
 
-    /// <summary>
-    /// How many panels the strip actually offers. Glyphs and Info arrive in Phase 6.
-    /// </summary>
+    /// <summary>How many panels the strip actually offers.</summary>
     public const int AvailablePanelCount = 3;
 
     [RelayCommand]
@@ -228,8 +233,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// This is what Ctrl+1, Ctrl+3 and Ctrl+4 do, so the numbers still run 1 to 4 across
-    /// the whole window as they did when these were four flat tabs. A panel that has not
-    /// been built yet falls back to Preview rather than leaving an empty strip selected.
+    /// the whole window as they did when these were four flat tabs. A panel past the end
+    /// of the strip falls back to Preview rather than leaving nothing selected.
     /// </remarks>
     [RelayCommand]
     private void ShowPanel(string? panel)
@@ -438,9 +443,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         finally
         {
             IsScanning = false;
-            OnPropertyChanged(nameof(FolderSummary));
-            OnPropertyChanged(nameof(SelectedPosition));
-            OnPropertyChanged(nameof(StatusText));
+            NotifyListChanged();
         }
 
         Debug.WriteLine($"Listed {Fonts.Count} fonts in {timer.ElapsedMilliseconds} ms");
@@ -453,14 +456,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await RefreshFavoriteFlagsAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Reads every file's metadata in the background, at low priority.
-    /// </summary>
-    /// <remarks>
-    /// The selected font is read first so its name is right immediately; the rest fill in
-    /// behind it. Collections expand here, because how many faces a file holds is not
-    /// knowable until it has been opened.
-    /// </remarks>
     /// <summary>
     /// Completes when the background metadata pass for the current folder has finished.
     /// </summary>
@@ -478,6 +473,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         MetadataScanCompleted = RunMetadataScanAsync(scan.Token);
     }
 
+    /// <summary>
+    /// Reads every file's metadata in the background, at low priority.
+    /// </summary>
+    /// <remarks>
+    /// The selected font is read first so its name is right immediately; the rest fill in
+    /// behind it. Collections expand here, because how many faces a file holds is not
+    /// knowable until it has been opened.
+    /// </remarks>
     private async Task RunMetadataScanAsync(CancellationToken cancellationToken)
     {
         try
@@ -511,8 +514,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (SortOrder != SortOrder.FileName) ApplySort();
 
                 RefreshFilter();
-                OnPropertyChanged(nameof(FolderSummary));
-                OnPropertyChanged(nameof(StatusText));
             }
         }
     }
@@ -550,8 +551,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         // The new faces have to reach the screen, which means through the filter.
         RefreshFilter();
-        OnPropertyChanged(nameof(SelectedPosition));
-        OnPropertyChanged(nameof(StatusText));
         return summaries.Length - 1;
     }
 
@@ -750,8 +749,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 ? null
                 : VisibleFonts[Math.Min(index, VisibleFonts.Count - 1)];
 
-            OnPropertyChanged(nameof(FolderSummary));
-            OnPropertyChanged(nameof(SelectedPosition));
+            NotifyListChanged();
         }
 
         await RefreshFavoriteFlagsAsync();
