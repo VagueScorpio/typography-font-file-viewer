@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using TypographyFontFileViewer.Core;
 using TypographyFontFileViewer.Services;
 using TypographyFontFileViewer.ViewModels;
@@ -376,7 +375,7 @@ public class FavoritesServiceTests : TempFolderTest
         Assert.False(result.Succeeded);
         Assert.Contains("Favorite Fonts", result.Error!, StringComparison.Ordinal);
         Assert.Contains("Move the app", result.Error!, StringComparison.Ordinal);
-        Assert.False(service.IsWritable);
+        Assert.NotNull(service.EnsureDirectoryWritable());
     }
 
     [Fact]

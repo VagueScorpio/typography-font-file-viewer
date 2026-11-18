@@ -1,5 +1,3 @@
-using System.IO;
-
 namespace TypographyFontFileViewer.Core;
 
 /// <summary>

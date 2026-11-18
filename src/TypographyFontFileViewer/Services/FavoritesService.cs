@@ -347,8 +347,6 @@ public sealed class FavoritesService
         }
     }
 
-    public bool IsWritable => EnsureDirectoryWritable() is null;
-
     // --- Internals -------------------------------------------------------------
 
     /// <summary>

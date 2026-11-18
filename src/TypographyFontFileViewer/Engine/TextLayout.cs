@@ -1,6 +1,5 @@
 using FreeTypeSharp;
 using HarfBuzzSharp;
-using TypographyFontFileViewer.Core;
 using static FreeTypeSharp.FT;
 using HbBuffer = HarfBuzzSharp.Buffer;
 
