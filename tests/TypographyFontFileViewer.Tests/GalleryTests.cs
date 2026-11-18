@@ -175,7 +175,7 @@ public class GalleryViewModelTests : TempFolderTest
     }
 
     [Fact]
-    public async Task ChangingTheTextOrTheSize_AsksEveryRowToRedrawOnce()
+    public void ChangingTheTextOrTheSize_AsksEveryRowToRedrawOnce()
     {
         using var service = new RenderService();
         using var preview = new PreviewViewModel(service);
@@ -191,8 +191,6 @@ public class GalleryViewModelTests : TempFolderTest
 
         preview.DarkBackground = true;
         Assert.Equal(before + 3, gallery.Epoch);
-
-        await Task.CompletedTask;
     }
 
     [Fact]
@@ -287,7 +285,7 @@ public class GalleryViewModelTests : TempFolderTest
     }
 
     [Fact]
-    public async Task TheGalleryRowHeight_FollowsTheSize()
+    public void TheGalleryRowHeight_FollowsTheSize()
     {
         using var service = new RenderService();
         using var preview = new PreviewViewModel(service);
@@ -300,6 +298,5 @@ public class GalleryViewModelTests : TempFolderTest
         double large = gallery.RowHeight;
 
         Assert.True(large > small * 3, "row height should scale with the gallery size");
-        await Task.CompletedTask;
     }
 }

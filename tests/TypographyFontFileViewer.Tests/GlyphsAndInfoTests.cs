@@ -12,83 +12,91 @@ namespace TypographyFontFileViewer.Tests;
 /// </summary>
 public class GlyphMapViewModelTests
 {
-
-    private static (GlyphMapViewModel Map, PreviewViewModel Preview, RenderService Render) Build()
+    /// <summary>
+    /// The three objects a glyph-map test needs, torn down in the order they were made.
+    /// </summary>
+    /// <remarks>
+    /// Thirteen tests were each writing a three-deep using pyramid around their whole
+    /// body. One disposable holds that relationship instead.
+    /// </remarks>
+    private sealed class GlyphMapFixture : IDisposable
     {
-        var render = new RenderService();
-        var preview = new PreviewViewModel(render);
-        return (new GlyphMapViewModel(render, preview), preview, render);
+        private readonly RenderService _render = new();
+        private readonly PreviewViewModel _preview;
+
+        public GlyphMapFixture()
+        {
+            _preview = new PreviewViewModel(_render);
+            Map = new GlyphMapViewModel(_render, _preview);
+        }
+
+        public GlyphMapViewModel Map { get; }
+
+        public void Dispose()
+        {
+            Map.Dispose();
+            _preview.Dispose();
+            _render.Dispose();
+        }
     }
 
     [Fact]
     public async Task SelectingAFont_FillsTheGridWithItsCharacters()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            Assert.NotEmpty(map.Rows);
-            Assert.All(map.Rows, row => Assert.InRange(row.Cells.Count, 1, 10));
-            Assert.Contains("characters", map.Status, StringComparison.Ordinal);
+        Assert.NotEmpty(map.Rows);
+        Assert.All(map.Rows, row => Assert.InRange(row.Cells.Count, 1, 10));
+        Assert.Contains("characters", map.Status, StringComparison.Ordinal);
 
-            // Every cell in a mapped-only grid has a character behind it.
-            Assert.All(map.Rows.SelectMany(row => row.Cells), cell => Assert.True(cell.IsMapped));
-        }
+        // Every cell in a mapped-only grid has a character behind it.
+        Assert.All(map.Rows.SelectMany(row => row.Cells), cell => Assert.True(cell.IsMapped));
     }
 
     [Fact]
     public async Task ChangingTheColumnCount_RelaysTheSameGlyphs()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            int total = map.Rows.Sum(row => row.Cells.Count);
-            int rowsAtTen = map.Rows.Count;
+        int total = map.Rows.Sum(row => row.Cells.Count);
+        int rowsAtTen = map.Rows.Count;
 
-            map.Columns = 20;
+        map.Columns = 20;
 
-            Assert.Equal(total, map.Rows.Sum(row => row.Cells.Count));
-            Assert.True(map.Rows.Count < rowsAtTen, "wider rows mean fewer of them");
-        }
+        Assert.Equal(total, map.Rows.Sum(row => row.Cells.Count));
+        Assert.True(map.Rows.Count < rowsAtTen, "wider rows mean fewer of them");
     }
 
     [Fact]
     public async Task ShowingUnmappedGlyphs_AddsThemAfterTheMappedOnes()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
-            int mappedOnly = map.Rows.Sum(row => row.Cells.Count);
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
+        int mappedOnly = map.Rows.Sum(row => row.Cells.Count);
 
-            map.ShowUnmapped = true;
-            await map.ReloadAsync();
+        map.ShowUnmapped = true;
+        await map.ReloadAsync();
 
-            int everything = map.Rows.Sum(row => row.Cells.Count);
-            Assert.True(everything >= mappedOnly);
-            Assert.Contains("unmapped", map.Status, StringComparison.Ordinal);
-        }
+        int everything = map.Rows.Sum(row => row.Cells.Count);
+        Assert.True(everything >= mappedOnly);
+        Assert.Contains("unmapped", map.Status, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -100,133 +108,107 @@ public class GlyphMapViewModelTests
     [InlineData("  U+0041  ", 0x41)]
     public void TheJumpBox_UnderstandsCodePoints(string typed, int expected)
     {
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-            Assert.Equal(expected, map.ParseJumpTarget(typed));
+        Assert.Equal(expected, map.ParseJumpTarget(typed));
     }
 
     [Fact]
     public void TheJumpBox_AlsoTakesTheCharacterItself()
     {
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            // A character that is not valid hex, so it can only be read as itself.
-            Assert.Equal('\u00F1', map.ParseJumpTarget("\u00F1"));
-            Assert.Equal('\u4E2D', map.ParseJumpTarget("\u4E2D"));
-        }
+        // A character that is not valid hex, so it can only be read as itself.
+        Assert.Equal('\u00F1', map.ParseJumpTarget("\u00F1"));
+        Assert.Equal('\u4E2D', map.ParseJumpTarget("\u4E2D"));
     }
 
     [Fact]
     public void TheJumpBox_SaysSoWhenItCannotTell()
     {
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            Assert.Equal(-1, map.ParseJumpTarget(""));
-            Assert.Equal(-1, map.ParseJumpTarget("   "));
-            Assert.Equal(-1, map.ParseJumpTarget(null));
-        }
+        Assert.Equal(-1, map.ParseJumpTarget(""));
+        Assert.Equal(-1, map.ParseJumpTarget("   "));
+        Assert.Equal(-1, map.ParseJumpTarget(null));
     }
 
     [Fact]
     public async Task JumpingToACharacter_FindsItsRow()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            map.JumpTo = "U+0041";              // capital A
-            int row = map.ResolveJumpRow();
+        map.JumpTo = "U+0041";              // capital A
+        int row = map.ResolveJumpRow();
 
-            Assert.InRange(row, 0, map.Rows.Count - 1);
-            Assert.Contains(map.Rows[row].Cells, cell => cell.Codepoint == 'A');
-        }
+        Assert.InRange(row, 0, map.Rows.Count - 1);
+        Assert.Contains(map.Rows[row].Cells, cell => cell.Codepoint == 'A');
     }
 
     [Fact]
     public async Task JumpingToSomethingTheFontLacks_SaysSoRatherThanScrolling()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            map.JumpTo = "U+4E2D";              // a CJK character Inter does not have
-            Assert.Equal(-1, map.ResolveJumpRow());
-            Assert.Contains("no U+4E2D", map.Status, StringComparison.Ordinal);
-        }
+        map.JumpTo = "U+4E2D";              // a CJK character Inter does not have
+        Assert.Equal(-1, map.ResolveJumpRow());
+        Assert.Contains("no U+4E2D", map.Status, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task ACell_RendersAndIsThenServedFromTheCache()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            GlyphEntry glyph = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == 'A');
+        GlyphEntry glyph = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == 'A');
 
-            var first = await map.RenderCellAsync(glyph, Tests.Cancellation);
-            Assert.NotNull(first);
-            Assert.True(first!.IsFrozen);
+        var first = await map.RenderCellAsync(glyph, Tests.Cancellation);
+        Assert.NotNull(first);
+        Assert.True(first!.IsFrozen);
 
-            var second = await map.RenderCellAsync(glyph, Tests.Cancellation);
-            Assert.Same(first, second);
-            Assert.True(map.Cache.Hits >= 1);
-        }
+        var second = await map.RenderCellAsync(glyph, Tests.Cancellation);
+        Assert.Same(first, second);
+        Assert.True(map.Cache.Hits >= 1);
     }
 
     [Fact]
     public async Task ManyCells_LeaveTheCacheAtItsOwnLimits()
     {
         string path = TestFonts.Require("NotoSans-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 20;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 20;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            foreach (GlyphEntry glyph in map.Rows.SelectMany(row => row.Cells).Take(1200))
-                await map.RenderCellAsync(glyph, Tests.Cancellation);
+        foreach (GlyphEntry glyph in map.Rows.SelectMany(row => row.Cells).Take(1200))
+            await map.RenderCellAsync(glyph, Tests.Cancellation);
 
-            Assert.True(map.Cache.Count <= FontEngineLimits.GlyphCellCount);
-            Assert.True(map.Cache.Bytes <= FontEngineLimits.GlyphCellBytes,
-                $"cache held {map.Cache.Bytes / (1024 * 1024)} MB");
-        }
+        Assert.True(map.Cache.Count <= FontEngineLimits.GlyphCellCount);
+        Assert.True(map.Cache.Bytes <= FontEngineLimits.GlyphCellBytes,
+            $"cache held {map.Cache.Bytes / (1024 * 1024)} MB");
     }
 
     [Fact]
@@ -235,96 +217,80 @@ public class GlyphMapViewModelTests
         string? path = TestFonts.OptionalSystemFont("msyh.ttc");
         if (path is null) Assert.Skip("msyh.ttc is not installed.");
 
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 12;
-            map.Face = FaceKey.For(path!, 0);
+        map.Columns = 12;
+        map.Face = FaceKey.For(path!, 0);
 
-            var timer = System.Diagnostics.Stopwatch.StartNew();
-            await map.ReloadAsync();
-            timer.Stop();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        await map.ReloadAsync();
+        timer.Stop();
 
-            int glyphs = map.Rows.Sum(row => row.Cells.Count);
-            Assert.True(glyphs > 20_000, $"expected a large glyph set, got {glyphs}");
-            Assert.True(timer.ElapsedMilliseconds < 20_000,
-                $"laying out {glyphs} glyphs took {timer.ElapsedMilliseconds} ms");
+        int glyphs = map.Rows.Sum(row => row.Cells.Count);
+        Assert.True(glyphs > 20_000, $"expected a large glyph set, got {glyphs}");
+        Assert.True(timer.ElapsedMilliseconds < 20_000,
+            $"laying out {glyphs} glyphs took {timer.ElapsedMilliseconds} ms");
 
-            // Only the rows exist up front; the cells inside them are rendered on demand.
-            Assert.Equal(0, map.Cache.Count);
-        }
+        // Only the rows exist up front; the cells inside them are rendered on demand.
+        Assert.Equal(0, map.Cache.Count);
     }
 
     [Fact]
     public async Task OpeningAGlyphsDetail_ReportsItsMeasurements()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            GlyphEntry glyph = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == 'H');
-            await map.OpenDetailCommand.ExecuteAsync(glyph);
+        GlyphEntry glyph = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == 'H');
+        await map.OpenDetailCommand.ExecuteAsync(glyph);
 
-            Assert.True(map.IsDetailOpen);
-            GlyphDetail detail = map.Detail!;
+        Assert.True(map.IsDetailOpen);
+        GlyphDetail detail = map.Detail!;
 
-            Assert.Equal('H', detail.Codepoint);
-            Assert.Equal("U+0048", detail.CodepointLabel);
-            Assert.True(detail.UnitsPerEm > 0);
-            Assert.True(detail.AdvanceWidth > 0, "a capital H has width");
-            Assert.True(detail.Width > 0 && detail.Height > 0);
-            Assert.False(detail.IsBlank);
+        Assert.Equal('H', detail.Codepoint);
+        Assert.Equal("U+0048", detail.CodepointLabel);
+        Assert.True(detail.UnitsPerEm > 0);
+        Assert.True(detail.AdvanceWidth > 0, "a capital H has width");
+        Assert.True(detail.Width > 0 && detail.Height > 0);
+        Assert.False(detail.IsBlank);
 
-            map.CloseDetailCommand.Execute(null);
-            Assert.False(map.IsDetailOpen);
-        }
+        map.CloseDetailCommand.Execute(null);
+        Assert.False(map.IsDetailOpen);
     }
 
     [Fact]
     public async Task ASpace_IsReportedAsBlankRatherThanMissing()
     {
         string path = TestFonts.Require("Inter-Regular.ttf");
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            map.Columns = 10;
-            map.Face = FaceKey.For(path, 0);
-            await map.ReloadAsync();
+        map.Columns = 10;
+        map.Face = FaceKey.For(path, 0);
+        await map.ReloadAsync();
 
-            GlyphEntry space = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == ' ');
-            await map.OpenDetailCommand.ExecuteAsync(space);
+        GlyphEntry space = map.Rows.SelectMany(row => row.Cells).First(c => c.Codepoint == ' ');
+        await map.OpenDetailCommand.ExecuteAsync(space);
 
-            GlyphDetail detail = map.Detail!;
-            Assert.True(detail.IsBlank);
-            Assert.True(detail.AdvanceWidth > 0, "a space takes up room even with no outline");
-        }
+        GlyphDetail detail = map.Detail!;
+        Assert.True(detail.IsBlank);
+        Assert.True(detail.AdvanceWidth > 0, "a space takes up room even with no outline");
     }
 
     [Fact]
     public void WithNoFontSelected_TheGridIsEmptyRatherThanBroken()
     {
-        (GlyphMapViewModel map, PreviewViewModel preview, RenderService render) = Build();
+        using var fixture = new GlyphMapFixture();
+        GlyphMapViewModel map = fixture.Map;
 
-        using (render)
-        using (preview)
-        using (map)
-        {
-            Assert.Empty(map.Rows);
-            Assert.Equal(-1, map.FindRowFor('A'));
-        }
+        Assert.Empty(map.Rows);
+        Assert.Equal(-1, map.FindRowFor('A'));
     }
 }
 
@@ -360,8 +326,6 @@ public class InfoViewModelTests
 
         // Nothing is shown blank: a row exists only when there is something in it.
         Assert.All(info.Rows, row => Assert.False(string.IsNullOrWhiteSpace(row.Value)));
-
-        await Task.CompletedTask;
     }
 
     [Fact]
