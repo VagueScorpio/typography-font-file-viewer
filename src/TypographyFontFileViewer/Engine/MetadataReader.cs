@@ -37,6 +37,16 @@ internal static unsafe class MetadataReader
     private const int NameTypographicFamily = 16;
     private const int NameTypographicSubfamily = 17;
 
+    /// <summary>
+    /// How far either walk of the character map will go before giving up.
+    /// </summary>
+    /// <remarks>
+    /// Unicode defines 0x110000 code points, so an honest font cannot reach this. A
+    /// damaged one must not be able to spin, and <see cref="ListGlyphs"/> allocates on
+    /// every turn, so running away there would cost memory as well as time.
+    /// </remarks>
+    private const int MaximumMappedCharacters = 2_000_000;
+
     private static readonly Encoding Utf16BigEndian = new UnicodeEncoding(bigEndian: true, byteOrderMark: false);
     private static Encoding? _macRoman;
 
@@ -180,7 +190,13 @@ internal static unsafe class MetadataReader
             uint glyphIndex;
             nuint codepoint = FT_Get_First_Char(ftFace, &glyphIndex);
 
-            while (glyphIndex != 0)
+            // The same ceiling CountMappedCharacters carries, and for the same reason:
+            // a damaged character map must not be able to spin here. This loop also
+            // allocates on every turn, so running away would cost memory as well as
+            // time. Unicode holds 0x110000 code points, so no honest font comes near.
+            int seenSoFar = 0;
+
+            while (glyphIndex != 0 && seenSoFar++ < MaximumMappedCharacters)
             {
                 int value = (int)Math.Min((ulong)codepoint, int.MaxValue);
                 entries.Add(new GlyphEntry(glyphIndex, value, GetGlyphName(face, glyphIndex)));
@@ -487,12 +503,8 @@ internal static unsafe class MetadataReader
         uint glyphIndex;
         nuint codepoint = FT_Get_First_Char(face, &glyphIndex);
 
-        while (glyphIndex != 0)
-        {
-            count++;
-            if (count > 2_000_000) break;    // a damaged cmap must not spin forever
+        while (glyphIndex != 0 && count++ < MaximumMappedCharacters)
             codepoint = FT_Get_Next_Char(face, codepoint, &glyphIndex);
-        }
 
         return count;
     }

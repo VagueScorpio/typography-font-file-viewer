@@ -183,9 +183,26 @@ internal static unsafe class TextLayout
         for (int i = 0; i < text.Length; i++)
         {
             // Step by whole code points so characters outside the BMP are not split.
-            int codepoint = char.ConvertToUtf32(text, i);
+            // Not char.ConvertToUtf32(string, int): it throws on half a surrogate
+            // pair, and a string is UTF-16 code units with no promise that they are
+            // well formed — the clipboard hands over an unpaired half quite happily.
+            // An unpaired half is not a character, so it is drawn as one: U+FFFD,
+            // which the font renders through .notdef exactly as it does any other
+            // character it does not have.
             int cluster = i;
-            if (char.IsHighSurrogate(text[i])) i++;
+            int codepoint;
+
+            if (char.IsHighSurrogate(text[i])
+                && i + 1 < text.Length
+                && char.IsLowSurrogate(text[i + 1]))
+            {
+                codepoint = char.ConvertToUtf32(text[i], text[i + 1]);
+                i++;
+            }
+            else
+            {
+                codepoint = char.IsSurrogate(text[i]) ? 0xFFFD : text[i];
+            }
 
             // Not a plain Unicode lookup: Windows FNT and friends index by byte value,
             // and symbol fonts hide their glyphs in the private use area.

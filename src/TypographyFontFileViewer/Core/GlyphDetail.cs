@@ -40,11 +40,6 @@ public sealed record GlyphDetail
 
     public bool IsMapped => Codepoint >= 0;
 
-    /// <summary>The character itself, when there is one to show.</summary>
-    public string? Character => IsMapped && Codepoint is not (>= 0 and <= 0x20)
-        ? char.ConvertFromUtf32(Codepoint)
-        : null;
-
     public string CodepointLabel => IsMapped
         ? DescribeCodepoint(Codepoint, GlyphIndex)
         : $"glyph #{GlyphIndex}";

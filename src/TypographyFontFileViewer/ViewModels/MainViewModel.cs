@@ -386,21 +386,34 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Re-reads the current folder from disk, keeping the selection if it survives.</summary>
+    /// <remarks>
+    /// Reached from F5 and from the Subfolders toggle, neither of which has anywhere
+    /// to put an exception: the command rethrows onto the dispatcher, and the toggle
+    /// does not await at all. So the I/O handling lives here, as it does in
+    /// <see cref="OpenPathAsync"/>.
+    /// </remarks>
     public async Task RescanAsync(CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(CurrentFolder)) return;
 
         string? selected = SelectedFont?.File.Path;
 
-        // Anything cached for this folder may be stale, so drop it before reloading —
-        // both the open faces and the gallery's rendered rows.
-        foreach (string path in Fonts.Select(font => font.File.Path).Distinct().ToList())
+        try
         {
-            await _renderService.InvalidateAsync(path, cancellationToken);
-            Gallery.Cache.InvalidatePath(path);
-        }
+            // Anything cached for this folder may be stale, so drop it before
+            // reloading — both the open faces and the gallery's rendered rows.
+            foreach (string path in Fonts.Select(font => font.File.Path).Distinct().ToList())
+            {
+                await _renderService.InvalidateAsync(path, cancellationToken);
+                Gallery.Cache.InvalidatePath(path);
+            }
 
-        await LoadFolderAsync(CurrentFolder, selected, cancellationToken);
+            await LoadFolderAsync(CurrentFolder, selected, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Message = exception.Message;
+        }
     }
 
     private async Task LoadFolderAsync(
@@ -697,7 +710,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(settings.LastFolder)) return;
         if (!Directory.Exists(settings.LastFolder)) return;
 
-        await LoadFolderAsync(settings.LastFolder, settings.LastSelectedFile, cancellationToken);
+        try
+        {
+            await LoadFolderAsync(settings.LastFolder, settings.LastSelectedFile, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // This runs from the window's Loaded handler, which is async void: an
+            // exception here would reach the dispatcher as an unhandled one and put
+            // a crash dialog in front of a user who has only just opened the app.
+            Message = exception.Message;
+        }
     }
 
     // --- Favourites ------------------------------------------------------------
@@ -829,12 +852,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var start = new ProcessStartInfo("explorer.exe")
-            {
-                // Explorer wants its path quoted, and /select, has no space after it.
-                Arguments = select ? $"/select,\"{path}\"" : $"\"{path}\"",
-                UseShellExecute = true,
-            };
+            // ArgumentList rather than a formatted Arguments string: the runtime quotes
+            // each item for itself, so nothing in a path can end the quoting and be read
+            // as a further argument. Windows forbids a quote in a file name, so this is
+            // not reachable today — but building a command line by concatenation is the
+            // wrong habit to leave behind in the one place that starts a process.
+            // UseShellExecute must be false for ArgumentList to be honoured.
+            var start = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+
+            // "/select," takes the path as part of the same argument, with no space.
+            if (select) start.ArgumentList.Add($"/select,{path}");
+            else start.ArgumentList.Add(path);
 
             Process.Start(start);
         }

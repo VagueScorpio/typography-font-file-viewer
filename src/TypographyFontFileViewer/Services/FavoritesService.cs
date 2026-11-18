@@ -444,26 +444,40 @@ public sealed class FavoritesService
         return found;
     }
 
-    private static IEnumerable<string> SafeEnumerateFonts(string folder)
+    /// <summary>
+    /// The fonts in the favourites folder, or as many as could be reached.
+    /// </summary>
+    /// <remarks>
+    /// Collected rather than streamed. <c>EnumerateFiles</c> is lazy, so a folder on
+    /// a share that drops partway through fails during the walk and not at the call
+    /// that starts it — and an iterator method cannot put a <c>yield return</c>
+    /// inside a <c>try</c> that has a <c>catch</c>. The favourites folder is small
+    /// and not recursive, so there is nothing to gain by streaming it anyway.
+    /// </remarks>
+    private static IReadOnlyList<string> SafeEnumerateFonts(string folder)
     {
-        IEnumerable<string> entries;
+        var fonts = new List<string>();
+
         try
         {
-            entries = System.IO.Directory.EnumerateFiles(folder, "*", new EnumerationOptions
-            {
-                IgnoreInaccessible = true,
-                RecurseSubdirectories = false,
-                AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
-            });
+            IEnumerable<string> entries = System.IO.Directory.EnumerateFiles(
+                folder, "*", new EnumerationOptions
+                {
+                    IgnoreInaccessible = true,
+                    RecurseSubdirectories = false,
+                    AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+                });
+
+            foreach (string path in entries)
+                if (FormatSniffer.IsSupportedFileName(Path.GetFileName(path)))
+                    fonts.Add(path);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            yield break;
+            // Reconcile with what could be read; the next run tries again.
         }
 
-        foreach (string path in entries)
-            if (FormatSniffer.IsSupportedFileName(Path.GetFileName(path)))
-                yield return path;
+        return fonts;
     }
 
     private void ReplaceIndex(Dictionary<string, FavoriteEntry> rebuilt)

@@ -44,7 +44,15 @@ public sealed class FolderScanner
             // subdirectory must not lose them the rest of the scan.
             IgnoreInaccessible = true,
             RecurseSubdirectories = includeSubfolders,
-            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+
+            // Hidden and System keep the scan to files a person put there.
+            // ReparsePoint keeps it out of junctions and symbolic links: one
+            // pointing back at an ancestor grows the path by a segment every time
+            // round until Windows refuses it, and no folder of fonts needs the app
+            // to follow one. Fonts that live only behind a junction are the price.
+            AttributesToSkip =
+                FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+
             MatchCasing = MatchCasing.CaseInsensitive,
             ReturnSpecialDirectories = false,
         };
@@ -56,35 +64,37 @@ public sealed class FolderScanner
         var companionsByFolder = new Dictionary<string, Dictionary<string, List<string>>>(
             StringComparer.OrdinalIgnoreCase);
 
-        IEnumerable<string> entries;
+        var candidates = new List<string>(256);
+
+        // EnumerateFiles is lazy: it builds an iterator and touches nothing. Every
+        // real failure — a share that drops, a drive pulled out, a path that grows
+        // past what Windows will take — therefore happens inside this walk rather
+        // than at the call that starts it, which is why the walk is what is guarded.
         try
         {
-            entries = Directory.EnumerateFiles(folder, "*", options);
+            foreach (string path in Directory.EnumerateFiles(folder, "*", options))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                string fileName = Path.GetFileName(path);
+                string extension = Path.GetExtension(fileName);
+
+                if (FormatSniffer.IsCompanionExtension(extension))
+                {
+                    RecordCompanion(companionsByFolder, path);
+                    continue;
+                }
+
+                if (!FormatSniffer.IsSupportedFileName(fileName)) continue;
+
+                candidates.Add(path);
+                if (candidates.Count >= MaximumFiles) break;
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return [];
-        }
-
-        var candidates = new List<string>(256);
-
-        foreach (string path in entries)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            string fileName = Path.GetFileName(path);
-            string extension = Path.GetExtension(fileName);
-
-            if (FormatSniffer.IsCompanionExtension(extension))
-            {
-                RecordCompanion(companionsByFolder, path);
-                continue;
-            }
-
-            if (!FormatSniffer.IsSupportedFileName(fileName)) continue;
-
-            candidates.Add(path);
-            if (candidates.Count >= MaximumFiles) break;
+            // Show what was reached before it failed. A folder that half-answers is
+            // more use than one that pretends to be empty.
         }
 
         foreach (string path in candidates)
