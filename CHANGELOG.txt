@@ -3,6 +3,10 @@
 ================================================================================
 
 TABLE OF CONTENTS
+  v1.1.0 - 2026-11-18
+    - Hardening: seven red-team findings
+    - Optimization: 337 lines out, same behaviour
+
   v1.0.0 - 2026-11-14
     - Phase 9: release
     - Phase 8: hardening
@@ -19,6 +23,150 @@ TABLE OF CONTENTS
     - Phase 0: scaffold and de-risk
     - Naming: Typography Font File Viewer
     - Repository scaffold
+
+--------------------------------------------------------------------------------
+ v1.1.0 - 2026-11-18
+--------------------------------------------------------------------------------
+
+Hardening: seven red-team findings
+  WHAT: An adversarial pass over the whole project - read every line looking
+        for ways to break it, break it, then close what opened. Seven findings,
+        all fixed, each with a regression test. New tests/HardeningTests.cs;
+        changes in FolderScanner, FavoritesService, MainViewModel, TextLayout,
+        HashService, MetadataReader and GlyphDetail.
+  WHY:  v1.0 shipped with four of five performance targets met and a stress
+        list that had been run rather than assumed. None of that asks the
+        question an attacker asks, which is not "does it work" but "what
+        happens if I do the worst thing I can think of".
+
+  THE ONE THAT MATTERED:
+        Directory.EnumerateFiles is lazy. It builds an iterator and touches
+        nothing. FolderScanner guarded the call that BUILDS the walk and then
+        ran the walk outside the guard, so every error that actually happens -
+        a share dropping, a drive pulled out, a path outgrowing what Windows
+        will take - escaped the scanner entirely. AttributesToSkip did not
+        include ReparsePoint either, so a directory junction pointing back at
+        an ancestor was followed, growing the path a segment per turn until the
+        OS refused it. mklink /J needs no administrator rights.
+
+        One bug, three symptoms, depending on the way in. Open folder caught it
+        and showed a message. Ticking Subfolders faulted a task nobody awaited,
+        so the list went stale in silence. F5 and the startup restore - the
+        second from an async void handler - put the "Something went wrong"
+        dialog in front of the user, and IncludeSubfolders is remembered, so
+        that repeated every launch.
+
+        This is also the generic hole behind "a USB drive pulled mid-scan",
+        which Phase 8's stress list believed it had covered. That test deleted
+        a folder BETWEEN scans. This one is DURING one.
+
+        The walk is inside the guard now, and a partial scan returns what it
+        reached rather than pretending the folder is empty. Junctions are
+        stepped over: fonts that live only behind one are no longer found with
+        Subfolders on, which is the price and is recorded as such. The two bare
+        routes into LoadFolderAsync carry the handling OpenPathAsync already
+        had. FavoritesService had the same mistake copied into it and is fixed
+        the same way.
+
+  THE REST:
+        - char.ConvertToUtf32(string, int) throws on half a surrogate pair, and
+          a string is UTF-16 code units with no promise they are well formed.
+          Pasting an unpaired surrogate into the preview box threw for Type 1,
+          BDF, PCF and Windows FNT - everything HarfBuzz cannot shape. An
+          unpaired half is drawn as U+FFFD now. The settings file was checked
+          as a route in and is not one: System.Text.Json rejects the escape.
+        - HashService remembered every file it had ever hashed, with no
+          eviction and nothing calling Clear. It is a count-bounded LRU now,
+          like every other cache here.
+        - Two functions walk the character map; one carried a ceiling against a
+          damaged cmap and the other, which allocates on every turn, did not.
+          Both share one constant now. Unconfirmed as exploitable - no cmap
+          could be built that makes FreeType's iterator run away - and the
+          guard is in anyway, because one author already thought it was needed.
+        - GlyphDetail.Character was dead and would have thrown for a font
+          mapping a surrogate code point. Deleted. It was also a miss from the
+          optimization pass below, whose dead-member sweep worked from a list
+          of suspects that did not include it.
+        - Explorer's arguments were built by string concatenation. Not
+          reachable, since Windows forbids a quote in a file name, but it is
+          the wrong habit in the one place the app starts a process.
+
+  WHAT HELD, WHICH IS WORTH RECORDING:
+        The WOFF and WOFF 2.0 decoders took everything - tampered, truncated,
+        bit-flipped, length-lying, bomb-sized. The hole most expected, a
+        rebuilt loca shorter than maxp claims, is defended from the other side,
+        because FreeType clamps the glyph count rather than trusting maxp. The
+        favourites path guard stopped both traversal and absolute paths. No
+        file is ever locked. Math.Clamp would have passed NaN through to WPF
+        layout, but the JSON reader rejects it first.
+
+  VERIFIED:
+        313 tests pass, zero warnings. Ten of them are new and every one broke
+        the app when it was written. The junction case was checked again in the
+        published exe: it now starts into a looped folder with Subfolders
+        ticked, lists the fonts and writes no log.
+
+Optimization: 337 lines out, same behaviour
+  WHAT: An outside audit of the whole project for size and structure, applied
+        as seven commits. 11,447 to 11,110 code lines across C#, XAML and the
+        build files; the app's own 6,615 to 6,457.
+  WHY:  Ten phases of building leave residue. Helpers written for a layer that
+        turned out not to need them, four hand-copies of one six-line idiom,
+        two near-identical WPF controls, test scaffolding retyped in eleven
+        classes.
+
+  HOW:  - 75 lines were provably dead: four public extension methods with no
+          caller anywhere, TextLayout.MeasureWidth, FaceKey.StillMatchesDisk,
+          three ByteReader properties, a field assigned and never read.
+        - FontRenderImage and GlyphCellImage were two 110-line classes
+          differing in four details. A SelfRenderingImage base holds the
+          cancellation lifetime, the recycled-container check and the two catch
+          clauses once.
+        - Four copies of BitmapSource.Create plus Freeze became FrozenBitmap.
+          Five copies of one cancellation handoff, under five copies of its
+          comment, became CancellationHandoff. Three copies of the U+XXXX
+          formatter became one. Five XAML views spelling out the same header
+          Border became one style.
+        - Eleven test classes each retyping the same temporary-folder
+          scaffolding became a TempFolderTest base; thirteen glyph-map tests
+          each opening with a three-deep using pyramid became a fixture.
+        - Idioms the language already has: a UTF-8 span literal instead of a
+          hand-written byte comparison, BinaryPrimitives instead of six
+          hand-assembled big-endian methods, a word-at-a-time canvas fill
+          instead of four stores per pixel, params ReadOnlySpan instead of an
+          array allocated fifteen times per font.
+
+  TWO REAL DEFECTS CAME OUT OF IT:
+        The crash log and the status bar each wrote "Version 1.0" as a literal,
+        which is exactly the drift AppInfo was added in Phase 9 to stop. Both
+        read the assembly now, which is why this release needed only the csproj
+        changing.
+
+  AND ONE GAP IN THE SUITE:
+        Rewriting the canvas fill raised the question of what was guarding it,
+        and the answer was nothing: both shipping render styles are grey, so
+        every test would have passed just as happily with red and blue swapped.
+        TheBackgroundColour_LandsInTheBufferAsBgra pins the channel order.
+
+  NOT DONE, ON PURPOSE:
+        The two companion-file scans look like duplicates but use different
+        extension lists deliberately, so merging them would change behaviour
+        either way; it is written down rather than guessed at. The two LRU
+        caches were left apart: one is deliberately not thread-safe and the
+        other locks everything, and a shared base would need a locking policy
+        and a disposal hook that read worse than two short classes.
+
+  THE EXE GREW BY 303 BYTES:
+        The app's own IL shrank by about a kilobyte, but the exe is a
+        compressed bundle of a 136 MB payload of which this app is 0.3%, so a
+        kilobyte moving changes how the rest compresses by more than the
+        kilobyte. There was never a footprint win here and none was invented.
+
+  VERIFIED:
+        303 tests pass, zero warnings. The three user-visible changes - the
+        shared header style, the status bar's version and the gallery's
+        double-click hit test - were checked in the running app against
+        screenshots of the previous build, since no test can see them.
 
 --------------------------------------------------------------------------------
  v1.0.0 - 2026-11-14  (first release)

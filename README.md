@@ -4,21 +4,23 @@ A lightweight, portable Windows font viewer that ships as **one stand-alone `.ex
 No installer, no .NET runtime to install, no registry writes. Copy the exe anywhere
 and run it.
 
-> **Status: v1.0 released.** Every format the blueprint promises opens, both views
-> work, favourites persist, and the exe is **60.4 MB** reaching a window in
-> **under a second**. See [Roadmap](#roadmap), [Known limits](#known-limits) and
+> **Status: v1.1.** Every format the blueprint promises opens, both views work,
+> favourites persist, and the exe is **60.4 MB** reaching a window in **under a
+> second**. Since v1.0: an optimization pass took out 337 lines without changing
+> behaviour, and an adversarial pass found and fixed seven ways to break it. See
+> [Roadmap](#roadmap), [Known limits](#known-limits) and
 > [the blueprint](docs/Typography-Font-File-Viewer-Blueprint-v1.1.md).
 
 ---
 
 ## Running it
 
-Download `TypographyFontFileViewer-v1.0.zip` from
-[the v1.0 release](https://github.com/VagueScorpio/typography-font-file-viewer/releases/tag/v1.0.0),
-take `TypographyFontFileViewer.exe` out of it, put it in a folder you can write to, and
-double-click it. Nothing is installed, nothing is
-unpacked beside it, and nothing is written to the registry. To remove it, delete the
-exe and the two or three files listed under [Portable files](#portable-files).
+Take the zip from
+[the latest release](https://github.com/VagueScorpio/typography-font-file-viewer/releases/latest),
+pull `TypographyFontFileViewer.exe` out of it, put it in a folder you can write to, and
+double-click it. Nothing is installed, nothing is unpacked beside it, and nothing is
+written to the registry. To remove it, delete the exe and the two or three files listed
+under [Portable files](#portable-files).
 
 Windows SmartScreen will warn about an unsigned exe downloaded from the internet;
 **More info** then **Run anyway** gets past it. Building it yourself from this
@@ -71,7 +73,7 @@ onto the window, or make it the handler for font files — see
 
 Formats are detected by **magic bytes first, extension second**, so a `.ttf` that
 is really CFF-based still opens. `.afm`, `.pfm` and `.inf` are treated as
-companion files, not fonts. Not supported in v1.0: `.eot`, SVG fonts, BMFont
+companion files, not fonts. Not supported: `.eot`, SVG fonts, BMFont
 `.fnt` — the scanner skips these quietly.
 
 ## Keyboard and mouse
@@ -136,11 +138,15 @@ produced: one `TypographyFontFileViewer.exe`, self-contained and single-file for
 `win-x64`, with the runtime, WPF and the native FreeType / HarfBuzz libraries packed
 inside. Symbols are embedded, so no `.pdb` ships beside it.
 
-At v1.0 the exe is **63,298,809 bytes (60.4 MB)** and reaches a usable window in
-**0.84–0.99 s** with a font on the command line, measured from a folder holding
-nothing but the exe. The very first launch, which also unpacks the native libraries,
-took 1.02 s. The blueprint's target is under 2 s. Tens of MB is the cost of needing
-nothing installed on the target PC.
+At v1.1 the exe is **63,299,693 bytes (60.4 MB)** and reaches a usable window in
+**0.90–1.01 s** with a font on the command line, measured from a folder holding
+nothing but the exe. The blueprint's target is under 2 s. Tens of MB is the cost of
+needing nothing installed on the target PC.
+
+The size has moved by under a kilobyte since v1.0 (63,298,809 bytes) in both
+directions, despite the app's own IL shrinking by about that much: the exe is a
+compressed bundle of a 136 MB payload of which this app is 0.3%, so a kilobyte of IL
+moving changes how the rest compresses by more than the kilobyte itself.
 
 To build and test during development:
 
@@ -175,7 +181,7 @@ tools\.venv\Scripts\python.exe tools\make-test-fonts.py
 That fetches open-licensed fonts, derives static instances from the variable ones,
 packs two of them into a `.ttc` and into a `.dfont`, and converts every SFNT font into
 matching `.woff` and `.woff2` — the triples the WOFF decoders are checked against.
-Roughly 21 MB, covering every v1.0 format. Details in
+Roughly 21 MB, covering every format the app opens. Details in
 [tools/README.md](tools/README.md). Tests skip with a message when a font is missing,
 so the suite runs without this step.
 
@@ -183,10 +189,14 @@ so the suite runs without this step.
 
 ```
 UI LAYER (WPF, MVVM)       MainWindow, FontListView, PreviewView,
-                           GalleryView, GlyphMapView, InfoView
+                           GalleryView, GlyphMapView, InfoView,
+                           SelfRenderingImage (a row, or a glyph cell,
+                             that fetches its own picture and gives up
+                             when it is recycled)
      | frozen BitmapSource        | async, cancellable requests
 SERVICES                   FolderScanner, FavoritesService,
-                           SettingsService, HashService, RenderService
+                           SettingsService, HashService (bounded LRU),
+                           RenderService, FrozenBitmap
      | BGRA buffers, metadata     | queued jobs (priority + cancel)
 FONT ENGINE                one thread owns ALL native objects:
                            FormatSniffer, FormatNormalizer (WOFF to SFNT),
@@ -230,6 +240,13 @@ changelog entry and a commit. Full criteria in blueprint Section 12.
 | 8 | Hardening against the stress list | **Done** |
 | 9 | Release: README, changelog, zip, size and cold-start report | **Done** |
 
+Since v1.0, two passes over the finished thing:
+
+| Pass | Scope | Result |
+|---|---|---|
+| Optimization | dead code, duplication, idiom, structure | −337 code lines, no behaviour change |
+| Hardening | an adversarial read of every line, then trying to break it | 7 findings, all fixed, 10 regression tests |
+
 Ideas deliberately left out of v1.0 — installing fonts to Windows, variable-font axis
 sliders, OpenType feature toggles, side-by-side compare, a full dark theme, EOT and
 SVG, specimen export, and auto-refresh on file changes — are listed in blueprint
@@ -247,10 +264,15 @@ Measured and recorded rather than smoothed over:
   buffer, anything over 85 KB lands on the large object heap, and that heap is not
   compacted by default. The fix is to pool those buffers, which first needs
   `RenderedText` to expose a length-bounded view rather than a raw array.
+- **Folders behind a junction are skipped.** With Subfolders on, the scan steps over
+  directory junctions and symbolic links rather than following them. A junction
+  pointing back at an ancestor would otherwise be walked until the path outgrew what
+  Windows accepts — which is what v1.1 fixed. The cost is that a font living *only*
+  behind a junction is not found.
 - **Not yet verified by a person:** a network share, a USB drive physically pulled
-  mid-scan, 200% display scaling, and a second monitor at a different DPI. The
-  automated stress tests cover a folder vanishing mid-use, which is the same code path
-  as the pulled drive, but not the hardware behaviour around it.
+  mid-scan, 200% display scaling, and a second monitor at a different DPI. v1.1 fixed
+  the code behind the pulled-drive case — an error during the walk no longer escapes
+  the scanner — but the hardware behaviour around it is still untested.
 - **A clean PC is still untested.** The exe starts here with `dotnet` off `PATH` and
   `DOTNET_ROOT` pointed at nothing, which is as close as a machine with .NET installed
   can get to proving it is self-contained.
